@@ -47,7 +47,7 @@ class FindFilesTest(unittest.TestCase):
         self.assertEqual(expected_files, files)
 
     @patch('os.listdir', return_value=["stripe_1.h5"])
-    def test_given_1_files_then_error(self, _):
+    def test_given_one_file_then_error(self, _):
 
         with self.assertRaises(IOError):
             vdsgen.find_files("/test/path", "stripe_")
@@ -108,7 +108,7 @@ class SimpleFunctionsTest(unittest.TestCase):
     def test_construct_vds_metadata(self):
         source = vdsgen.Source(frames=3, height=256, width=2048,
                                dtype="uint16", datasets=[""]*6)
-        expected_vds = vdsgen.VDS(shape=(3, 1586, 2048), offset=266,
+        expected_vds = vdsgen.VDS(shape=(3, 1586, 2048), spacing=266,
                                   path="/test/path")
 
         vds = vdsgen.construct_vds_metadata(source, "/test/path")
@@ -121,7 +121,7 @@ class SimpleFunctionsTest(unittest.TestCase):
     def test_create_vds_maps(self, target_mock, source_mock, map_mock):
         source = vdsgen.Source(frames=3, height=256, width=2048,
                                dtype="uint16", datasets=["source"]*6)
-        vds = vdsgen.VDS(shape=(3, 1586, 2048), offset=266, path="/test/path")
+        vds = vdsgen.VDS(shape=(3, 1586, 2048), spacing=266, path="/test/path")
 
         map_list = vdsgen.create_vds_maps(source, vds)
 

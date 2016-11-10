@@ -1,19 +1,22 @@
 #!/bin/env dls-python
+"""A CLI tool for generating virtual datasets from individual HDF5 files."""
 
 import os
 import sys
 from argparse import ArgumentParser
 import re
 import logging
-logging.basicConfig(level=logging.DEBUG)
 
 from collections import namedtuple
-Source = namedtuple("Source", "datasets, frames, height, width, dtype")
-VDS = namedtuple("VDS", "shape, offset, path")
 
 import h5py as h5
 
-DATA_SPACING = 10  # Pixel spacing between each sub image
+logging.basicConfig(level=logging.DEBUG)
+
+Source = namedtuple("Source", "datasets, frames, height, width, dtype")
+VDS = namedtuple("VDS", "shape, spacing, path")
+
+DATASET_SPACING = 10  # Pixel spacing between each dataset in VDS
 
 
 def parse_args():
@@ -60,7 +63,7 @@ def generate_vds_name(prefix, files):
 
     Args:
         prefix(str): Root name of image files
-        files: HDF5 being combined
+        files(list(str)): HDF5 files being combined
 
     Returns:
         str: Name of VDS file
@@ -79,8 +82,7 @@ def grab_metadata(file_path):
         file_path(str): Path to HDF5 file
 
     Returns:
-        Source: Number of frames, height and width of data, data type and
-            shape, (a tuple of (frames, height, width))
+        Source: Number of frames, height, width and data type of datasets
 
     """
     h5_data = h5.File(file_path, 'r')["data"]
@@ -97,7 +99,8 @@ def process_source_datasets(datasets):
         datasets(list(str)): Datasets to grab data from
 
     Returns:
-        int, Data: Number of files and attributes of data
+        Source: Number of datasets and the attributes of them (frames, height
+            width and data type)
 
     """
     data = grab_metadata(datasets[0])
@@ -112,22 +115,22 @@ def process_source_datasets(datasets):
 
 
 def construct_vds_metadata(source, output_file):
-    """Construct VDS data attributes from source attributes
+    """Construct VDS data attributes from source attributes.
 
     Args:
         source(Source): Attributes of data sets
         output_file(str): File path of new VDS
 
     Returns:
-        VDS: Shape and offset of virtual data set
+        VDS: Shape, dataset spacing and output path of virtual data set
 
     """
     datasets = len(source.datasets)
-    height = (source.height * datasets) + (DATA_SPACING * (datasets - 1))
+    height = (source.height * datasets) + (DATASET_SPACING * (datasets - 1))
     shape = (source.frames, height, source.width)
-    offset = source.height + DATA_SPACING
+    spacing = source.height + DATASET_SPACING
 
-    return VDS(shape=shape, offset=offset, path=output_file)
+    return VDS(shape=shape, spacing=spacing, path=output_file)
 
 
 def create_vds_maps(source, vds_data):
@@ -152,7 +155,7 @@ def create_vds_maps(source, vds_data):
         source_file = source.datasets[idx]
         v_source = h5.VirtualSource(source_file, "data", shape=source_shape)
 
-        start = idx * vds_data.offset
+        start = idx * vds_data.spacing
         stop = start + source.height
         v_target = vds[:, start:stop, :]
 
@@ -168,21 +171,21 @@ def main():
 
     file_paths = find_files(args.path, args.prefix)
     vds_name = generate_vds_name(args.prefix, file_paths)
+    output_file = os.path.join(args.path, vds_name)
 
     file_names = [file_.split('/')[-1] for file_ in file_paths]
     logging.debug("Combining datasets %s into %s",
                   ", ".join(file_names), vds_name)
 
     source = process_source_datasets(file_paths)
-    output_file = os.path.join(args.path, vds_name)
     vds_data = construct_vds_metadata(source, output_file)
-
     map_list = create_vds_maps(source, vds_data)
 
+    logging.info("Creating VDS at %s", output_file)
     with h5.File(output_file, "w", libver="latest") as vds_file:
-        logging.info("Creating VDS at %s", output_file)
         vds_file.create_virtual_dataset(VMlist=map_list, fill_value=0x1)
-        logging.info("Creation successful!")
+
+    logging.info("Creation successful!")
 
 
 if __name__ == "__main__":
