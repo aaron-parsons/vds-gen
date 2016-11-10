@@ -11,7 +11,7 @@ from collections import namedtuple
 
 import h5py as h5
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 Source = namedtuple("Source", "datasets, frames, height, width, dtype")
 VDS = namedtuple("VDS", "shape, spacing, path")
@@ -174,7 +174,7 @@ def main():
     output_file = os.path.join(args.path, vds_name)
 
     file_names = [file_.split('/')[-1] for file_ in file_paths]
-    logging.debug("Combining datasets %s into %s",
+    logging.info("Combining datasets %s into %s",
                   ", ".join(file_names), vds_name)
 
     source = process_source_datasets(file_paths)
