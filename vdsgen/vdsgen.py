@@ -13,8 +13,8 @@ import h5py as h5
 
 logging.basicConfig(level=logging.INFO)
 
-Source = namedtuple("Source", "datasets, frames, height, width, dtype")
-VDS = namedtuple("VDS", "shape, spacing, path")
+Source = namedtuple("Source", ["datasets", "frames", "height", "width", "dtype"])
+VDS = namedtuple("VDS", ["shape", "spacing", "path"])
 
 DATASET_SPACING = 10  # Pixel spacing between each dataset in VDS
 
@@ -82,7 +82,7 @@ def grab_metadata(file_path):
         file_path(str): Path to HDF5 file
 
     Returns:
-        Source: Number of frames, height, width and data type of datasets
+        dict: Number of frames, height, width and data type of datasets
 
     """
     h5_data = h5.File(file_path, 'r')["data"]
@@ -175,7 +175,7 @@ def main():
 
     file_names = [file_.split('/')[-1] for file_ in file_paths]
     logging.info("Combining datasets %s into %s",
-                  ", ".join(file_names), vds_name)
+                 ", ".join(file_names), vds_name)
 
     source = process_source_datasets(file_paths)
     vds_data = construct_vds_metadata(source, output_file)
