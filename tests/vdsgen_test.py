@@ -46,6 +46,18 @@ class FindFilesTest(unittest.TestCase):
 
         self.assertEqual(expected_files, files)
 
+    @patch('os.listdir',
+           return_value=["stripe_4.h5", "stripe_1.h5", "stripe_6.h5",
+                         "stripe_3.h5", "stripe_2.h5", "stripe_5.h5"])
+    def test_given_files_out_of_order_then_return(self, _):
+        expected_files = ["/test/path/stripe_1.h5", "/test/path/stripe_2.h5",
+                          "/test/path/stripe_3.h5", "/test/path/stripe_4.h5",
+                          "/test/path/stripe_5.h5", "/test/path/stripe_6.h5"]
+
+        files = vdsgen.find_files("/test/path", "stripe_")
+
+        self.assertEqual(expected_files, files)
+
     @patch('os.listdir', return_value=["stripe_1.h5"])
     def test_given_one_file_then_error(self, _):
 

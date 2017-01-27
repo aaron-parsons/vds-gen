@@ -46,7 +46,7 @@ def find_files(path, prefix):
     regex = re.compile(prefix + r"\d\.(hdf5|h5)")
 
     files = []
-    for file_ in os.listdir(path):
+    for file_ in sorted(os.listdir(path)):
         if re.match(regex, file_):
             files.append(os.path.join(path, file_))
 
