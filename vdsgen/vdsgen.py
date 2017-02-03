@@ -58,7 +58,7 @@ def find_files(path, prefix):
         return files
 
 
-def generate_vds_name(prefix, files):
+def construct_vds_name(prefix, files):
     """Generate the file name for the VDS from the sub files.
 
     Args:
@@ -165,13 +165,11 @@ def create_vds_maps(source, vds_data):
     return map_list
 
 
-def main():
-    """Run program."""
-    args = parse_args()
-
-    file_paths = find_files(args.path, args.prefix)
-    vds_name = generate_vds_name(args.prefix, file_paths)
-    output_file = os.path.join(args.path, vds_name)
+def generate_vds(path, prefix):
+    """Generate a virtual dataset."""
+    file_paths = find_files(path, prefix)
+    vds_name = construct_vds_name(prefix, file_paths)
+    output_file = os.path.join(path, vds_name)
 
     file_names = [file_.split('/')[-1] for file_ in file_paths]
     logging.info("Combining datasets %s into %s",
@@ -187,6 +185,11 @@ def main():
 
     logging.info("Creation successful!")
 
+
+def main():
+    """Run program."""
+    args = parse_args()
+    generate_vds(args.path, args.prefix)
 
 if __name__ == "__main__":
     sys.exit(main())
