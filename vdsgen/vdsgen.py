@@ -13,7 +13,8 @@ import h5py as h5
 
 logging.basicConfig(level=logging.INFO)
 
-Source = namedtuple("Source", ["datasets", "frames", "height", "width", "dtype"])
+Source = namedtuple("Source",
+                    ["datasets", "frames", "height", "width", "dtype"])
 VDS = namedtuple("VDS", ["shape", "spacing", "path"])
 
 DATASET_SPACING = 10  # Pixel spacing between each dataset in VDS
