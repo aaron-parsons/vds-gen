@@ -148,12 +148,10 @@ def create_vds_maps(source, vds_data):
     vds = h5.VirtualTarget(vds_data.path, "full_frame", shape=vds_data.shape)
 
     map_list = []
-    datasets = len(source.datasets)
-    for idx in range(datasets):
+    for idx, dataset in enumerate(source.datasets):
         logging.info("Processing dataset %s", idx + 1)
 
-        source_file = source.datasets[idx]
-        v_source = h5.VirtualSource(source_file, "data", shape=source_shape)
+        v_source = h5.VirtualSource(dataset, "data", shape=source_shape)
 
         start = idx * vds_data.spacing
         stop = start + source.height
