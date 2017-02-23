@@ -46,6 +46,18 @@ class FindFilesTest(unittest.TestCase):
 
         self.assertEqual(expected_files, files)
 
+    @patch('os.listdir',
+           return_value=["stripe_4.h5", "stripe_1.h5", "stripe_6.h5",
+                         "stripe_3.h5", "stripe_2.h5", "stripe_5.h5"])
+    def test_given_files_out_of_order_then_return(self, _):
+        expected_files = ["/test/path/stripe_1.h5", "/test/path/stripe_2.h5",
+                          "/test/path/stripe_3.h5", "/test/path/stripe_4.h5",
+                          "/test/path/stripe_5.h5", "/test/path/stripe_6.h5"]
+
+        files = vdsgen.find_files("/test/path", "stripe_")
+
+        self.assertEqual(expected_files, files)
+
     @patch('os.listdir', return_value=["stripe_1.h5"])
     def test_given_one_file_then_error(self, _):
 
@@ -66,7 +78,7 @@ class SimpleFunctionsTest(unittest.TestCase):
         files = ["stripe_1.h5", "stripe_2.h5", "stripe_3.h5",
                  "stripe_4.h5", "stripe_5.h5", "stripe_6.h5"]
 
-        vds_name = vdsgen.generate_vds_name("stripe_", files)
+        vds_name = vdsgen.construct_vds_name("stripe_", files)
 
         self.assertEqual(expected_name, vds_name)
 
@@ -144,18 +156,16 @@ class MainTest(unittest.TestCase):
     @patch(vdsgen_patch_path + '.create_vds_maps')
     @patch(vdsgen_patch_path + '.construct_vds_metadata')
     @patch(vdsgen_patch_path + '.process_source_datasets')
-    @patch(vdsgen_patch_path + '.generate_vds_name',
+    @patch(vdsgen_patch_path + '.construct_vds_name',
            return_value="stripe_vds.h5")
-    @patch(vdsgen_patch_path + '.find_files')
-    @patch(vdsgen_patch_path + '.parse_args',
-           return_value=MagicMock(path="/test/path", prefix="stripe_"))
-    def test_correct_calls_made(self, parse_mock, find_mock, gen_mock,
-                                process_mock, construct_mock, create_mock,
-                                h5file_mock):
+    @patch(vdsgen_patch_path + '.find_files',
+           return_value=["stripe_1.hdf5", "stripe_2.hdf5", "stripe_3.hdf5"])
+    def test_generate_vds(self, find_mock, gen_mock, process_mock,
+                          construct_mock, create_mock, h5file_mock):
+        vds_file_mock = self.file_mock.__enter__.return_value
 
-        vdsgen.main()
+        vdsgen.generate_vds("/test/path", "stripe_")
 
-        parse_mock.assert_called_once_with()
         find_mock.assert_called_once_with("/test/path", "stripe_")
         gen_mock.assert_called_once_with("stripe_", find_mock.return_value)
         process_mock.assert_called_once_with(find_mock.return_value)
@@ -165,5 +175,16 @@ class MainTest(unittest.TestCase):
                                             construct_mock.return_value)
         h5file_mock.assert_called_once_with("/test/path/stripe_vds.h5", "w",
                                             libver="latest")
-        self.file_mock.__enter__.return_value.create_virtual_dataset.assert_called_once_with(
+        vds_file_mock.create_virtual_dataset.assert_called_once_with(
             VMlist=create_mock.return_value, fill_value=0x1)
+
+    @patch(vdsgen_patch_path + '.generate_vds')
+    @patch(vdsgen_patch_path + '.parse_args',
+           return_value=MagicMock(path="/test/path", prefix="stripe_"))
+    def test_main(self, parse_mock, generate_mock):
+        args_mock = parse_mock.return_value
+
+        vdsgen.main()
+
+        parse_mock.assert_called_once_with()
+        generate_mock.assert_called_once_with(args_mock.path, args_mock.prefix)

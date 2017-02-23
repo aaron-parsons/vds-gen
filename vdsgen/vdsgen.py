@@ -13,8 +13,9 @@ import h5py as h5
 
 logging.basicConfig(level=logging.INFO)
 
-Source = namedtuple("Source", "datasets, frames, height, width, dtype")
-VDS = namedtuple("VDS", "shape, spacing, path")
+Source = namedtuple("Source",
+                    ["datasets", "frames", "height", "width", "dtype"])
+VDS = namedtuple("VDS", ["shape", "spacing", "path"])
 
 DATASET_SPACING = 10  # Pixel spacing between each dataset in VDS
 
@@ -46,7 +47,7 @@ def find_files(path, prefix):
     regex = re.compile(prefix + r"\d\.(hdf5|h5)")
 
     files = []
-    for file_ in os.listdir(path):
+    for file_ in sorted(os.listdir(path)):
         if re.match(regex, file_):
             files.append(os.path.join(path, file_))
 
@@ -58,7 +59,7 @@ def find_files(path, prefix):
         return files
 
 
-def generate_vds_name(prefix, files):
+def construct_vds_name(prefix, files):
     """Generate the file name for the VDS from the sub files.
 
     Args:
@@ -82,7 +83,7 @@ def grab_metadata(file_path):
         file_path(str): Path to HDF5 file
 
     Returns:
-        Source: Number of frames, height, width and data type of datasets
+        dict: Number of frames, height, width and data type of datasets
 
     """
     h5_data = h5.File(file_path, 'r')["data"]
@@ -148,12 +149,10 @@ def create_vds_maps(source, vds_data):
     vds = h5.VirtualTarget(vds_data.path, "full_frame", shape=vds_data.shape)
 
     map_list = []
-    datasets = len(source.datasets)
-    for idx in range(datasets):
+    for idx, dataset in enumerate(source.datasets):
         logging.info("Processing dataset %s", idx + 1)
 
-        source_file = source.datasets[idx]
-        v_source = h5.VirtualSource(source_file, "data", shape=source_shape)
+        v_source = h5.VirtualSource(dataset, "data", shape=source_shape)
 
         start = idx * vds_data.spacing
         stop = start + source.height
@@ -165,17 +164,22 @@ def create_vds_maps(source, vds_data):
     return map_list
 
 
-def main():
-    """Run program."""
-    args = parse_args()
+def generate_vds(path, prefix):
+    """Generate a virtual dataset.
 
-    file_paths = find_files(args.path, args.prefix)
-    vds_name = generate_vds_name(args.prefix, file_paths)
-    output_file = os.path.join(args.path, vds_name)
+    Args:
+        path(str): Path to folder containing HDF5 files
+        prefix(str): Prefix of HDF5 files to generate from (in <path> folder)
+            e.g. image_ for image_1.hdf5, image_2.hdf5, image_3.hdf5
+
+    """
+    file_paths = find_files(path, prefix)
+    vds_name = construct_vds_name(prefix, file_paths)
+    output_file = os.path.join(path, vds_name)
 
     file_names = [file_.split('/')[-1] for file_ in file_paths]
     logging.info("Combining datasets %s into %s",
-                  ", ".join(file_names), vds_name)
+                 ", ".join(file_names), vds_name)
 
     source = process_source_datasets(file_paths)
     vds_data = construct_vds_metadata(source, output_file)
@@ -187,6 +191,11 @@ def main():
 
     logging.info("Creation successful!")
 
+
+def main():
+    """Run program."""
+    args = parse_args()
+    generate_vds(args.path, args.prefix)
 
 if __name__ == "__main__":
     sys.exit(main())
