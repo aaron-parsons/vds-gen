@@ -165,7 +165,14 @@ def create_vds_maps(source, vds_data):
 
 
 def generate_vds(path, prefix):
-    """Generate a virtual dataset."""
+    """Generate a virtual dataset.
+
+    Args:
+        path(str): Path to folder containing HDF5 files
+        prefix(str): Prefix of HDF5 files to generate from (in <path> folder)
+            e.g. image_ for image_1.hdf5, image_2.hdf5, image_3.hdf5
+
+    """
     file_paths = find_files(path, prefix)
     vds_name = construct_vds_name(prefix, file_paths)
     output_file = os.path.join(path, vds_name)
