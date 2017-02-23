@@ -158,9 +158,11 @@ class MainTest(unittest.TestCase):
     @patch(vdsgen_patch_path + '.process_source_datasets')
     @patch(vdsgen_patch_path + '.construct_vds_name',
            return_value="stripe_vds.h5")
-    @patch(vdsgen_patch_path + '.find_files')
+    @patch(vdsgen_patch_path + '.find_files',
+           return_value=["stripe_1.hdf5", "stripe_2.hdf5", "stripe_3.hdf5"])
     def test_generate_vds(self, find_mock, gen_mock, process_mock,
                           construct_mock, create_mock, h5file_mock):
+        vds_file_mock = self.file_mock.__enter__.return_value
 
         vdsgen.generate_vds("/test/path", "stripe_")
 
@@ -173,7 +175,7 @@ class MainTest(unittest.TestCase):
                                             construct_mock.return_value)
         h5file_mock.assert_called_once_with("/test/path/stripe_vds.h5", "w",
                                             libver="latest")
-        self.file_mock.__enter__.return_value.create_virtual_dataset.assert_called_once_with(
+        vds_file_mock.create_virtual_dataset.assert_called_once_with(
             VMlist=create_mock.return_value, fill_value=0x1)
 
     @patch(vdsgen_patch_path + '.generate_vds')
