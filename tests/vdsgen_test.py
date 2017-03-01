@@ -1,17 +1,20 @@
+import os
+import sys
 import unittest
+
+import numpy as np
 
 from pkg_resources import require
 require("mock")
 from mock import MagicMock, patch, ANY, call
-vdsgen_patch_path = "vdsgen.vdsgen"
-parser_patch_path = "argparse.ArgumentParser"
-h5py_patch_path = "h5py"
 
-import os
-import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "h5py"))
 
 from vdsgen import vdsgen
+
+vdsgen_patch_path = "vdsgen.vdsgen"
+parser_patch_path = "argparse.ArgumentParser"
+h5py_patch_path = "h5py"
 
 
 class ParseArgsTest(unittest.TestCase):
@@ -143,11 +146,34 @@ class SimpleFunctionsTest(unittest.TestCase):
                                             shape=(3, 1586, 2048))
         source_mock.assert_has_calls([call("source", "data",
                                            shape=(3, 256, 2048))]*6)
-        # TODO: Improve this assert by passing numpy arrays to check slicing
         map_mock.assert_has_calls([call(source_mock.return_value,
                                         target_mock.return_value.__getitem__.return_value,
                                         dtype="uint16")]*6)
         self.assertEqual([map_mock.return_value]*6, map_list)
+
+    def test_create_vds_maps_system_test(self):
+        mock_arrays = [np.full((256, 2048), fill) for fill in range(6)]
+        source = vdsgen.Source(frames=3, height=256, width=2048,
+                               dtype="uint16",
+                               datasets=mock_arrays)
+        vds = vdsgen.VDS(shape=(3, 1586, 2048), spacing=[10] * 5 + [0],
+                         path="/test/path")
+
+        map_list = vdsgen.create_vds_maps(source, vds)
+
+        for idx, array in enumerate(mock_arrays[:-1]):
+            np.testing.assert_array_equal(array, map_list[idx].src.path)
+            self.assertEqual(idx * (256 + 10),
+                             map_list[idx].target.slice_list[1].start)
+            self.assertEqual((idx + 1) * (256 + 10),
+                             map_list[idx].target.slice_list[1].stop)
+
+        # Final array doesn't have gap added at the end
+        np.testing.assert_array_equal(mock_arrays[-1], map_list[-1].src.path)
+        self.assertEqual(5 * (256 + 10),
+                         map_list[-1].target.slice_list[1].start)
+        self.assertEqual((5 + 1) * (256 + 10) - 10,
+                         map_list[-1].target.slice_list[1].stop)
 
 
 class MainTest(unittest.TestCase):
