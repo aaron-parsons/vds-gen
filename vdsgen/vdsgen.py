@@ -51,7 +51,7 @@ def find_files(path, prefix):
     files = []
     for file_ in sorted(os.listdir(path)):
         if re.match(regex, file_):
-            files.append(os.path.join(path, file_))
+            files.append(os.path.abspath(os.path.join(path, file_)))
 
     if len(files) == 0:
         raise IOError("No files matching pattern found.")
@@ -186,7 +186,7 @@ def generate_vds(path, prefix):
     """
     file_paths = find_files(path, prefix)
     vds_name = construct_vds_name(prefix, file_paths)
-    output_file = os.path.join(path, vds_name)
+    output_file = os.path.abspath(os.path.join(path, vds_name))
 
     file_names = [file_.split('/')[-1] for file_ in file_paths]
     logging.info("Combining datasets %s into %s",
