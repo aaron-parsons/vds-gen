@@ -46,7 +46,7 @@ def find_files(path, prefix):
         list: HDF5 files in folder that have the given prefix
 
     """
-    regex = re.compile(prefix + r"\d\.(hdf5|h5)")
+    regex = re.compile(prefix + r"\d+\.(hdf5|hdf|h5)")
 
     files = []
     for file_ in sorted(os.listdir(path)):
