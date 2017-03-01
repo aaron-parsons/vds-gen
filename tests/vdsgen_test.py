@@ -120,7 +120,8 @@ class SimpleFunctionsTest(unittest.TestCase):
     def test_construct_vds_metadata(self):
         source = vdsgen.Source(frames=3, height=256, width=2048,
                                dtype="uint16", datasets=[""]*6)
-        expected_vds = vdsgen.VDS(shape=(3, 1586, 2048), spacing=266,
+        expected_vds = vdsgen.VDS(shape=(3, 1586, 2048),
+                                  spacing=[10] * 5 + [0],
                                   path="/test/path")
 
         vds = vdsgen.construct_vds_metadata(source, "/test/path")
@@ -133,7 +134,8 @@ class SimpleFunctionsTest(unittest.TestCase):
     def test_create_vds_maps(self, target_mock, source_mock, map_mock):
         source = vdsgen.Source(frames=3, height=256, width=2048,
                                dtype="uint16", datasets=["source"]*6)
-        vds = vdsgen.VDS(shape=(3, 1586, 2048), spacing=266, path="/test/path")
+        vds = vdsgen.VDS(shape=(3, 1586, 2048), spacing=[10] * 5 + [0],
+                         path="/test/path")
 
         map_list = vdsgen.create_vds_maps(source, vds)
 
@@ -188,3 +190,5 @@ class MainTest(unittest.TestCase):
 
         parse_mock.assert_called_once_with()
         generate_mock.assert_called_once_with(args_mock.path, args_mock.prefix)
+        source = vdsgen.Source(frames=3, height=256, width=2048,
+                               dtype="uint16", datasets=[""]*6)
