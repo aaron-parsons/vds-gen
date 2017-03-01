@@ -54,7 +54,8 @@ def find_files(path, prefix):
             files.append(os.path.abspath(os.path.join(path, file_)))
 
     if len(files) == 0:
-        raise IOError("No files matching pattern found.")
+        raise IOError("No files matching pattern found. Got path: {path}, "
+                      "prefix: {prefix}".format(path=path, prefix=prefix))
     elif len(files) < 2:
         raise IOError("Folder must contain more than one matching HDF5 file.")
     else:
