@@ -18,7 +18,8 @@ Source = namedtuple("Source",
 VDS = namedtuple("VDS", ["shape", "spacing", "path"])
 
 INTER_MODULE_SPACING = 10  # Pixel spacing between stripes in a module
-MODULE_SPACING = 10  # Pixel spacing between modules
+MODULE_SPACING = 10        # Pixel spacing between modules
+DATA_PATH = "data"         # Location of data in HDF5 file tree
 
 
 def parse_args():
@@ -87,7 +88,7 @@ def grab_metadata(file_path):
         dict: Number of frames, height, width and data type of datasets
 
     """
-    h5_data = h5.File(file_path, 'r')["data"]
+    h5_data = h5.File(file_path, 'r')[DATA_PATH]
     frames, height, width = h5_data.shape
     data_type = h5_data.dtype
 
@@ -161,7 +162,7 @@ def create_vds_maps(source, vds_data):
     for idx, dataset in enumerate(source.datasets):
         logging.info("Processing dataset %s", idx + 1)
 
-        v_source = h5.VirtualSource(dataset, "data", shape=source_shape)
+        v_source = h5.VirtualSource(dataset, DATA_PATH, shape=source_shape)
 
         start = current_position
         stop = start + source.height + vds_data.spacing[idx]
