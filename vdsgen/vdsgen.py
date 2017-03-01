@@ -17,7 +17,8 @@ Source = namedtuple("Source",
                     ["datasets", "frames", "height", "width", "dtype"])
 VDS = namedtuple("VDS", ["shape", "spacing", "path"])
 
-DATASET_SPACING = 10  # Pixel spacing between each dataset in VDS
+INTER_MODULE_SPACING = 10  # Pixel spacing between stripes in a module
+MODULE_SPACING = 10  # Pixel spacing between modules
 
 
 def parse_args():
@@ -126,10 +127,17 @@ def construct_vds_metadata(source, output_file):
         VDS: Shape, dataset spacing and output path of virtual data set
 
     """
-    datasets = len(source.datasets)
-    height = (source.height * datasets) + (DATASET_SPACING * (datasets - 1))
+    stripes = len(source.datasets)
+
+    spacing = [0] * stripes
+    for idx in range(0, stripes - 1, 2):
+        spacing[idx] = INTER_MODULE_SPACING
+    for idx in range(1, stripes, 2):
+        spacing[idx] = MODULE_SPACING
+    spacing[-1] = 0  # We don't want the final stripe to have a gap afterwards
+
+    height = (source.height * stripes) + sum(spacing)
     shape = (source.frames, height, source.width)
-    spacing = source.height + DATASET_SPACING
 
     return VDS(shape=shape, spacing=spacing, path=output_file)
 
@@ -149,15 +157,17 @@ def create_vds_maps(source, vds_data):
     vds = h5.VirtualTarget(vds_data.path, "full_frame", shape=vds_data.shape)
 
     map_list = []
+    current_position = 0
     for idx, dataset in enumerate(source.datasets):
         logging.info("Processing dataset %s", idx + 1)
 
         v_source = h5.VirtualSource(dataset, "data", shape=source_shape)
 
-        start = idx * vds_data.spacing
-        stop = start + source.height
-        v_target = vds[:, start:stop, :]
+        start = current_position
+        stop = start + source.height + vds_data.spacing[idx]
+        current_position = stop
 
+        v_target = vds[:, start:stop, :]
         v_map = h5.VirtualMap(v_source, v_target, dtype=source.dtype)
         map_list.append(v_map)
 
