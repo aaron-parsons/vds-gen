@@ -40,6 +40,33 @@ HDF_CAPTURE = IOC_ROOT + "HDF:Capture"
 HDF_MODE = IOC_ROOT + "HDF:FileWriteMode"
 STREAM_MODE = 2
 
+# Create Virtual Dataset ######################################################
+
+print("Creating VDS...")
+file_prefix = file_name + "{:05d}_".format(run_number)
+files = ["{prefix}{fem}.h5".format(prefix=file_prefix, fem=fem)
+         for fem in FEMS]
+
+PYTHON_ANACONDA = "/dls_sw/apps/python/anaconda/1.7.0/64/bin/python"
+VDS_GEN = "/home/mef65357/Detectors/VDS/vds-gen/vdsgen/vdsgen.py"
+EMPTY = "-e"
+FILES = "-f"
+FRAMES = "--frames"
+STRIPE_SPACING = "-s"
+MODULE_SPACING = "-m"
+DATA_PATH = "-d"
+
+subprocess.call([PYTHON_ANACONDA, VDS_GEN, file_path,
+                 EMPTY,
+                 FILES, files,
+                 FRAMES, 3,
+                 STRIPE_SPACING, 3
+                 MODULE_SPACING, 127,
+                 DATA_PATH, "entry/data/data"])
+
+# from vdsgen import generate_vds
+# generate_vds(file_path, file_prefix)
+
 # Trigger Acquisition #########################################################
 
 if reset_file_num:
@@ -82,12 +109,12 @@ print("Acquisition complete.")
 
 # Create Virtual Dataset ######################################################
 
-print("Creating VDS...")
-file_prefix = file_name + "{:05d}_".format(run_number)
-
-PYTHON_ANACONDA = "/dls_sw/apps/python/anaconda/1.7.0/64/bin/python"
-VDS_GEN = "/home/mef65357/Detectors/VDS/vds-gen/vdsgen/vdsgen.py"
-subprocess.call([PYTHON_ANACONDA, VDS_GEN, file_path, file_prefix])
-
-# from vdsgen import generate_vds
-# generate_vds(file_path, file_prefix)
+# print("Creating VDS...")
+# file_prefix = file_name + "{:05d}_".format(run_number)
+#
+# PYTHON_ANACONDA = "/dls_sw/apps/python/anaconda/1.7.0/64/bin/python"
+# VDS_GEN = "/home/mef65357/Detectors/VDS/vds-gen/vdsgen/vdsgen.py"
+# subprocess.call([PYTHON_ANACONDA, VDS_GEN, file_path, file_prefix])
+#
+# # from vdsgen import generate_vds
+# # generate_vds(file_path, file_prefix)
