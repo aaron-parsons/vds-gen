@@ -27,10 +27,37 @@ def parse_args():
     parser = ArgumentParser()
     parser.add_argument("path", type=str,
                         help="Path to folder containing HDF5 files.")
-    parser.add_argument("prefix", type=str,
-                        help="Root name of images - e.g 'stripe_' to combine "
-                             "the images 'stripe_1.hdf5', 'stripe_2.hdf5' "
-                             "and 'stripe_3.hdf5' located at <path>.")
+
+    # Definition of file names in <path> - Common prefix or explicit list
+    file_definition = parser.add_mutually_exclusive_group(required=True)
+    file_definition.add_argument(
+        "-p", "--prefix", type=str, default=None, dest="prefix",
+        help="Prefix of files - e.g 'stripe_' to combine the images "
+             "'stripe_1.hdf5', 'stripe_2.hdf5' and 'stripe_3.hdf5' located "
+             "at <path>.")
+    file_definition.add_argument(
+        "-f", "--files", nargs="*", type=str, default=None, dest="files",
+        help="Manually define files to combine.")
+
+    # Arguments required to allow VDS to be created before raw files exist
+    parser.add_argument(
+        "-e", "--empty", action="store_true", dest="empty",
+        help="Make empty VDS pointing to datasets that don't exist, yet.")
+    source_metadata = parser.add_argument_group()
+    source_metadata.add_argument(
+        "--frames", type=int, default=1, dest="frames",
+        help="Number of frames to combine into VDS.")
+    source_metadata.add_argument(
+        "--height", type=int, default=256, dest="height",
+        help="Height of raw datasets.")
+    source_metadata.add_argument(
+        "--width", type=int, default=1024, dest="width",
+        help="Width of raw datasets.")
+    source_metadata.add_argument(
+        "--data_type", type=str, default="uint16", dest="data_type",
+        help="Data type of raw datasets.")
+
+    # Arguments to override defaults
     parser.add_argument("-s", "--stripe_spacing", nargs="?", type=int,
                         default=None, dest="stripe_spacing",
                         help="Spacing between two stripes in a module.")
@@ -41,7 +68,16 @@ def parse_args():
                         dest="data_path",
                         help="Data location in HDF5 files.")
 
-    return parser.parse_args()
+    args = parser.parse_args()
+
+    if args.empty and args.files is None:
+        parser.error(
+            "To make an empty VDS you must explicitly define --files for the "
+            "eventual raw datasets.")
+    if args.files is not None and len(args.files) < 2:
+        parser.error("Must define at least two files to combine.")
+
+    return args
 
 
 def find_files(path, prefix):
@@ -88,37 +124,39 @@ def construct_vds_name(prefix, files):
     return vds_name
 
 
-def grab_metadata(file_path, data_path=None):
+def grab_metadata(file_path, data_path):
     """Grab data from given HDF5 file.
 
     Args:
         file_path(str): Path to HDF5 file
+        data_path(str): Location of raw data in HDF5 file
 
     Returns:
         dict: Number of frames, height, width and data type of datasets
 
     """
-    h5_data = h5.File(file_path, 'r')[DATA_PATH]
+    h5_data = h5.File(file_path, 'r')[data_path]
     frames, height, width = h5_data.shape
     data_type = h5_data.dtype
 
     return dict(frames=frames, height=height, width=width, dtype=data_type)
 
 
-def process_source_datasets(datasets):
+def process_source_datasets(datasets, data_path):
     """Grab data from the given HDF5 files and check for consistency.
 
     Args:
         datasets(list(str)): Datasets to grab data from
+        data_path(str): Location of raw data in HDF5 file
 
     Returns:
         Source: Number of datasets and the attributes of them (frames, height
             width and data type)
 
     """
-    data = grab_metadata(datasets[0])
+    data = grab_metadata(datasets[0], data_path)
     for path in datasets[1:]:
-        temp_data = grab_metadata(path)
+        temp_data = grab_metadata(path, data_path)
         for attribute, value in data.items():
             if temp_data[attribute] != value:
                 raise ValueError("Files have mismatched {}".format(attribute))
@@ -193,33 +231,52 @@ def create_vds_maps(source, vds_data, data_path):
     return map_list
 
 
-def generate_vds(path, prefix, data_path, stripe_spacing, module_spacing):
+def generate_vds(path, prefix=None, files=None, source=None, data_path=None,
+                 stripe_spacing=None, module_spacing=None):
     """Generate a virtual dataset.
 
     Args:
         path(str): Path to folder containing HDF5 files
         prefix(str): Prefix of HDF5 files to generate from (in <path> folder)
             e.g. image_ for image_1.hdf5, image_2.hdf5, image_3.hdf5
+        files(list(str)): List of files to combine.
+        source(dict): Height, width, data_type and frames for source data
         data_path(str): Path to raw data in HDF5 file
         stripe_spacing(int): Spacing between stripes in module
         module_spacing(int): Spacing between modules
 
     """
+    if (prefix is None and files is None) or \
+            (prefix is not None and files is not None):
+        raise ValueError("One, and only one, of prefix or files required.")
+
     if data_path is None:
         data_path = DATA_PATH
 
-    file_paths = find_files(path, prefix)
-    vds_name = construct_vds_name(prefix, file_paths)
+    if files is None:
+        file_paths = find_files(path, prefix)
+        files = [path_.split("/")[-1] for path_ in file_paths]
+    else:
+        file_paths = [os.path.join(path, file_) for file_ in files]
+        prefix = os.path.commonprefix(files)
+
+    vds_name = construct_vds_name(prefix, files)
     output_file = os.path.abspath(os.path.join(path, vds_name))
 
     file_names = [file_.split('/')[-1] for file_ in file_paths]
     logging.info("Combining datasets %s into %s",
                  ", ".join(file_names), vds_name)
 
-    source = process_source_datasets(file_paths)
-    vds_data = construct_vds_metadata(source, output_file,
+    if source is None:
+        source_metadata = process_source_datasets(file_paths, data_path)
+    else:
+        source_metadata = Source(
+            frames=source['frames'], height=source['height'],
+            width=source['width'], dtype=source['dtype'], datasets=file_paths)
+
+    vds_data = construct_vds_metadata(source_metadata, output_file,
                                       stripe_spacing, module_spacing)
-    map_list = create_vds_maps(source, vds_data, data_path)
+    map_list = create_vds_maps(source_metadata, vds_data, data_path)
 
     logging.info("Creating VDS at %s", output_file)
     with h5.File(output_file, "w", libver="latest") as vds_file:
@@ -232,8 +289,14 @@ def main():
     """Run program."""
     args = parse_args()
 
-    generate_vds(args.path, args.prefix, args.data_path,
-                 args.stripe_spacing, args.module_spacing)
+    if args.empty:
+        source_metadata = dict(frames=args.frames, height=args.height,
+                               width=args.width, dtype=args.data_type)
+    else:
+        source_metadata = None
+
+    generate_vds(args.path, args.prefix, args.files, source_metadata,
+                 args.data_path, args.stripe_spacing, args.module_spacing)
 
 if __name__ == "__main__":
     sys.exit(main())
