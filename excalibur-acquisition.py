@@ -11,6 +11,9 @@ file_path = "/dls/i14/data/2017/cm16755-1/tmp/excalibur"
 file_name = "stripe"
 num_frames = 10
 acquire_time = 10
+stripe_height = 256
+stripe_width = 2069
+data_type = "int16"
 reset_file_num = False
 
 # Shortcuts ###################################################################
@@ -40,11 +43,19 @@ HDF_CAPTURE = IOC_ROOT + "HDF:Capture"
 HDF_MODE = IOC_ROOT + "HDF:FileWriteMode"
 STREAM_MODE = 2
 
+# Read Run Number #############################################################
+
+if reset_file_num:
+    caput(HDF_FILE_NUM.format(ALL_FEMS), 1)
+if len(set(caget([HDF_NUM.format(fem) for fem in FEMS]))) != 1:
+    raise IOError("NumCapture does not match on each node of detector")
+run_number = caget(HDF_FILE_NUM.format(1))
+
 # Create Virtual Dataset ######################################################
 
 print("Creating VDS...")
 file_prefix = file_name + "{:05d}_".format(run_number)
-files = ["{prefix}{fem}.h5".format(prefix=file_prefix, fem=fem)
+files = ["{prefix}{fem}.hdf5".format(prefix=file_prefix, fem=fem)
          for fem in FEMS]
 
 PYTHON_ANACONDA = "/dls_sw/apps/python/anaconda/1.7.0/64/bin/python"
@@ -55,25 +66,34 @@ FRAMES = "--frames"
 STRIPE_SPACING = "-s"
 MODULE_SPACING = "-m"
 DATA_PATH = "-d"
+HEIGHT = "--height"
+WIDTH = "--width"
+DATA_TYPE = "--data_type"
 
-subprocess.call([PYTHON_ANACONDA, VDS_GEN, file_path,
-                 EMPTY,
-                 FILES, files,
-                 FRAMES, 3,
-                 STRIPE_SPACING, 3
-                 MODULE_SPACING, 127,
-                 DATA_PATH, "entry/data/data"])
+# Base arguments
+command = [PYTHON_ANACONDA, VDS_GEN, file_path]
+# Define empty and required arguments to do so
+command += [EMPTY,
+            FILES] + files + \
+           [FRAMES, str(num_frames),
+            HEIGHT, str(stripe_height),
+            WIDTH, str(stripe_width),
+            DATA_TYPE, data_type]
+# Override default spacing and data path
+command += [STRIPE_SPACING, "3",
+            MODULE_SPACING, "127",
+            DATA_PATH, "entry/data/data"]
+
+subprocess.call(command)
 
 # from vdsgen import generate_vds
-# generate_vds(file_path, file_prefix)
+#
+# source_metadata = dict(frames=num_frames, height=256, width=1024,
+#                        data_type="int16")
+# generate_vds(file_path, files=files, data_path="entry/data/data",
+#              stripe_spacing=3, module_spacing=127, source=source_metadata)
 
 # Trigger Acquisition #########################################################
-
-if reset_file_num:
-    caput(HDF_FILE_NUM.format(ALL_FEMS), 1)
-if len(set(caget([HDF_NUM.format(fem) for fem in FEMS]))) != 1:
-    raise IOError("NumCapture does not match on each node of detector")
-run_number = caget(HDF_FILE_NUM.format(1))
 
 print("Setting parameters")
 
@@ -115,6 +135,6 @@ print("Acquisition complete.")
 # PYTHON_ANACONDA = "/dls_sw/apps/python/anaconda/1.7.0/64/bin/python"
 # VDS_GEN = "/home/mef65357/Detectors/VDS/vds-gen/vdsgen/vdsgen.py"
 # subprocess.call([PYTHON_ANACONDA, VDS_GEN, file_path, file_prefix])
-#
+
 # # from vdsgen import generate_vds
 # # generate_vds(file_path, file_prefix)
