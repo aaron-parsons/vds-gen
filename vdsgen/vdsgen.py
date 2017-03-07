@@ -268,6 +268,10 @@ def generate_vds(path, prefix=None, files=None, source=None, data_path=None,
                  ", ".join(file_names), vds_name)
 
     if source is None:
+        for file_ in file_paths:
+            if not os.path.isfile(file_):
+                raise IOError("To create VDS from raw files that haven't been "
+                              "created yet, source must be provided.")
         source_metadata = process_source_datasets(file_paths, data_path)
     else:
         source_metadata = Source(
