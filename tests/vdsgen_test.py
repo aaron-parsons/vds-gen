@@ -44,9 +44,12 @@ class ParseArgsTest(unittest.TestCase):
              call("-m", "--module_spacing", nargs="?", type=int, default=None,
                   dest="module_spacing",
                   help="Spacing between two modules."),
-             call("-d", "--data_path", nargs="?", type=str, default=None,
-                  dest="data_path",
-                  help="Data location in HDF5 files.")])
+             call("--source_node", nargs="?", type=str, default=None,
+                  dest="source_node",
+                  help="Data node in source HDF5 files."),
+             call("--target_node", nargs="?", type=str, default=None,
+                  dest="target_node",
+                  help="Data node in VDS file.")])
 
         add_group_mock.assert_called_with()
         group_mock.add_argument.assert_has_calls(
@@ -202,7 +205,7 @@ class SimpleFunctionsTest(unittest.TestCase):
         vds = vdsgen.VDS(shape=(3, 1586, 2048), spacing=[10] * 5 + [0],
                          path="/test/path")
 
-        map_list = vdsgen.create_vds_maps(source, vds, "data")
+        map_list = vdsgen.create_vds_maps(source, vds, "data", "full_frame")
 
         target_mock.assert_called_once_with("/test/path", "full_frame",
                                             shape=(3, 1586, 2048))
@@ -244,7 +247,7 @@ class MainTest(unittest.TestCase):
                                                None, None)
         create_mock.assert_called_once_with(process_mock.return_value,
                                             construct_mock.return_value,
-                                            "data")
+                                            "data", "full_frame")
         h5file_mock.assert_called_once_with("/test/path/stripe_vds.h5", "w",
                                             libver="latest")
         vds_file_mock.create_virtual_dataset.assert_called_once_with(
@@ -266,7 +269,7 @@ class MainTest(unittest.TestCase):
 
         vdsgen.generate_vds("/test/path", files=files, output="vds.h5",
                             source=source_dict,
-                            data_path="data",
+                            source_node="data",
                             stripe_spacing=3, module_spacing=127)
 
         metadata_mock.assert_called_once_with(source,
@@ -274,7 +277,7 @@ class MainTest(unittest.TestCase):
                                               3, 127)
         create_mock.assert_called_once_with(source,
                                             metadata_mock.return_value,
-                                            "data")
+                                            "data", "full_frame")
         h5file_mock.assert_called_once_with("/test/path/vds.h5", "w",
                                             libver="latest")
         vds_file_mock.create_virtual_dataset.assert_called_once_with(
@@ -300,7 +303,8 @@ class MainTest(unittest.TestCase):
                path="/test/path", prefix="stripe_", empty=True,
                files=["file1.hdf5", "file2.hdf5"], output="vds",
                frames=3, height=256, width=2048, data_type="int16",
-               data_path="data", stripe_spacing=3, module_spacing=127))
+               source_node="data", target_node="full_frame",
+               stripe_spacing=3, module_spacing=127))
     def test_main_empty(self, parse_mock, generate_mock):
         args_mock = parse_mock.return_value
 
@@ -312,7 +316,8 @@ class MainTest(unittest.TestCase):
             prefix=args_mock.prefix, output="vds", files=args_mock.files,
             source=dict(frames=args_mock.frames, height=args_mock.height,
                         width=args_mock.width, dtype=args_mock.data_type),
-            data_path=args_mock.data_path,
+            source_node=args_mock.source_node,
+            target_node=args_mock.target_node,
             stripe_spacing=args_mock.stripe_spacing,
             module_spacing=args_mock.module_spacing)
 
@@ -322,7 +327,8 @@ class MainTest(unittest.TestCase):
                path="/test/path", prefix="stripe_", empty=False,
                files=["file1.hdf5", "file2.hdf5"], output="vds",
                frames=3, height=256, width=2048, data_type="int16",
-               data_path="data", stripe_spacing=3, module_spacing=127))
+               source_node="data", target_node="full_frame",
+               stripe_spacing=3, module_spacing=127))
     def test_main_not_empty(self, parse_mock, generate_mock):
         args_mock = parse_mock.return_value
 
@@ -333,6 +339,7 @@ class MainTest(unittest.TestCase):
             args_mock.path,
             prefix=args_mock.prefix, output="vds", files=args_mock.files,
             source=None,
-            data_path=args_mock.data_path,
+            source_node=args_mock.source_node,
             stripe_spacing=args_mock.stripe_spacing,
+            target_node=args_mock.target_node,
             module_spacing=args_mock.module_spacing)
