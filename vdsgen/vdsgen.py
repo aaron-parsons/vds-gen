@@ -251,7 +251,8 @@ def generate_vds(path, prefix=None, files=None, output=None, source=None,
             e.g. image_ for image_1.hdf5, image_2.hdf5, image_3.hdf5
         files(list(str)): List of files to combine.
         output(str): Name of VDS file.
-        source(dict): Height, width, data_type and frames for source data
+        source(dict): Height, width, data_type and frames for source data.
+            Provide this to create a VDS for raw files that don't exist yet.
         source_node(str): Data node in source HDF5 files
         target_node(str): Data node in VDS file
         stripe_spacing(int): Spacing between stripes in module
@@ -288,8 +289,9 @@ def generate_vds(path, prefix=None, files=None, output=None, source=None,
     if source is None:
         for file_ in file_paths:
             if not os.path.isfile(file_):
-                raise IOError("To create VDS from raw files that haven't been "
-                              "created yet, source must be provided.")
+                raise IOError("File {} does not exist. To create VDS from raw "
+                              "files that haven't been created yet, source "
+                              "must be provided.".format(file_))
         source_metadata = process_source_datasets(file_paths, source_node)
     else:
         source_metadata = Source(
