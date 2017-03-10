@@ -240,6 +240,27 @@ def create_vds_maps(source, vds_data, source_node, target_node):
     return map_list
 
 
+def validate_node(vds_file, target_node):
+    """Check if it is possible to create the given node.
+
+    Check the target node is valid (no leading or trailing slashes)
+    Create any sub-group of the target node if it doesn't exist.
+
+    Args:
+        vds_file(h5py.File): File to check for node
+        target_node(str): Full path to node
+
+    """
+    if target_node.startswith("/") or target_node.endswith("/"):
+        raise ValueError("Target node should have no leading or trailing "
+                         "slashes, got {}".format(target_node))
+
+    if "/" in target_node:
+        sub_group = target_node.rsplit("/", 1)[0]
+        if vds_file.get(sub_group) is None:
+            vds_file.create_group(sub_group)
+
+
 def generate_vds(path, prefix=None, files=None, output=None, source=None,
                  source_node=None, target_node=None,
                  stripe_spacing=None, module_spacing=None):
@@ -312,6 +333,7 @@ def generate_vds(path, prefix=None, files=None, output=None, source=None,
 
     logging.info("Creating VDS at %s", output_file)
     with h5.File(output_file, "w", libver="latest") as vds_file:
+        validate_node(vds_file, target_node)
         vds_file.create_virtual_dataset(VMlist=map_list, fill_value=0x1)
 
     logging.info("Creation successful!")

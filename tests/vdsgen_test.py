@@ -218,6 +218,35 @@ class SimpleFunctionsTest(unittest.TestCase):
         self.assertEqual([map_mock.return_value]*6, map_list)
 
 
+class ValidateNodeTest(unittest.TestCase):
+
+    def setUp(self):
+        self.file_mock = MagicMock()
+
+    def test_validate_node_creates(self):
+        self.file_mock.get.return_value = None
+
+        vdsgen.validate_node(self.file_mock, "entry/detector/detector1")
+
+        self.file_mock.create_group.assert_called_once_with("entry/detector")
+
+    def test_validate_node_exists_then_no_op(self):
+        self.file_mock.get.return_value = "Group"
+
+        vdsgen.validate_node(self.file_mock, "entry/detector/detector1")
+
+        self.file_mock.create_group.assert_not_called()
+
+    def test_validate_node_invalid_then_error(self):
+
+        with self.assertRaises(ValueError):
+            vdsgen.validate_node(self.file_mock, "/entry/detector/detector1")
+        with self.assertRaises(ValueError):
+            vdsgen.validate_node(self.file_mock, "entry/detector/detector1/")
+        with self.assertRaises(ValueError):
+            vdsgen.validate_node(self.file_mock, "/entry/detector/detector1/")
+
+
 class MainTest(unittest.TestCase):
 
     file_mock = MagicMock()
