@@ -281,6 +281,13 @@ def generate_vds(path, prefix=None, files=None, output=None, source=None,
         vds_name = output
 
     output_file = os.path.abspath(os.path.join(path, vds_name))
+    if os.path.isfile(output_file):
+        with h5.File(output_file, "r", libver="latest") as vds_file:
+            node = vds_file.get(target_node)
+            if node is not None:
+                raise IOError("VDS {file} already has an entry for node "
+                              "{node}".format(file=output_file,
+                                              node=target_node))
 
     file_names = [file_.split('/')[-1] for file_ in file_paths]
     logging.info("Combining datasets %s into %s",
