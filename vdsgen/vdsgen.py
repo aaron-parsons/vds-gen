@@ -26,7 +26,8 @@ def parse_args():
     """Parse command line arguments."""
     parser = ArgumentParser()
     parser.add_argument("path", type=str,
-                        help="Path to folder containing HDF5 files.")
+                        help="Root folder to create VDS in. Also where source "
+                             "files are searched for if --prefix given.")
 
     # Definition of file names in <path> - Common prefix or explicit list
     file_definition = parser.add_mutually_exclusive_group(required=True)
@@ -38,6 +39,9 @@ def parse_args():
     file_definition.add_argument(
         "-f", "--files", nargs="*", type=str, default=None, dest="files",
         help="Manually define files to combine.")
+    parser.add_argument(
+        "-o", "--output", type=str, default=None, dest="output",
+        help="Output file name. Default is input file prefix with vds suffix.")
 
     # Arguments required to allow VDS to be created before raw files exist
     parser.add_argument(
@@ -231,8 +235,8 @@ def create_vds_maps(source, vds_data, data_path):
     return map_list
 
 
-def generate_vds(path, prefix=None, files=None, source=None, data_path=None,
-                 stripe_spacing=None, module_spacing=None):
+def generate_vds(path, prefix=None, files=None, output=None, source=None,
+                 data_path=None, stripe_spacing=None, module_spacing=None):
     """Generate a virtual dataset.
 
     Args:
@@ -240,6 +244,7 @@ def generate_vds(path, prefix=None, files=None, source=None, data_path=None,
         prefix(str): Prefix of HDF5 files to generate from (in <path> folder)
             e.g. image_ for image_1.hdf5, image_2.hdf5, image_3.hdf5
         files(list(str)): List of files to combine.
+        output(str): Name of VDS file.
         source(dict): Height, width, data_type and frames for source data
         data_path(str): Path to raw data in HDF5 file
         stripe_spacing(int): Spacing between stripes in module
@@ -260,7 +265,11 @@ def generate_vds(path, prefix=None, files=None, source=None, data_path=None,
         file_paths = [os.path.join(path, file_) for file_ in files]
         prefix = os.path.commonprefix(files)
 
-    vds_name = construct_vds_name(prefix, files)
+    if output is None:
+        vds_name = construct_vds_name(prefix, files)
+    else:
+        vds_name = output
+
     output_file = os.path.abspath(os.path.join(path, vds_name))
 
     file_names = [file_.split('/')[-1] for file_ in file_paths]
@@ -299,8 +308,12 @@ def main():
     else:
         source_metadata = None
 
-    generate_vds(args.path, args.prefix, args.files, source_metadata,
-                 args.data_path, args.stripe_spacing, args.module_spacing)
+    generate_vds(args.path,
+                 prefix=args.prefix, files=args.files, output=args.output,
+                 source=source_metadata,
+                 data_path=args.data_path,
+                 stripe_spacing=args.stripe_spacing,
+                 module_spacing=args.module_spacing)
 
 if __name__ == "__main__":
     sys.exit(main())

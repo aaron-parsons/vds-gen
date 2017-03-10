@@ -30,7 +30,11 @@ class ParseArgsTest(unittest.TestCase):
 
         add_mock.assert_has_calls(
             [call("path", type=str,
-                  help="Path to folder containing HDF5 files."),
+                  help="Root folder to create VDS in. Also where source "
+                       "files are searched for if --prefix given."),
+             call("-o", "--output", type=str, default=None, dest="output",
+                  help="Output file name. Default is input file prefix with "
+                       "vds suffix."),
              call("-e", "--empty", action="store_true", dest="empty",
                   help="Make empty VDS pointing to datasets "
                        "that don't exist, yet."),
@@ -250,9 +254,7 @@ class MainTest(unittest.TestCase):
     @patch(h5py_patch_path + '.File', return_value=file_mock)
     @patch(vdsgen_patch_path + '.create_vds_maps')
     @patch(vdsgen_patch_path + '.construct_vds_metadata')
-    @patch(vdsgen_patch_path + '.construct_vds_name',
-           return_value="stripe_vds.h5")
-    def test_generate_vds_given_args(self, gen_mock, construct_mock,
+    def test_generate_vds_given_args(self, metadata_mock,
                                      create_mock, h5file_mock, isfile_mock):
         self.file_mock.reset_mock()
         vds_file_mock = self.file_mock.__enter__.return_value
@@ -262,19 +264,18 @@ class MainTest(unittest.TestCase):
         source = vdsgen.Source(frames=3, height=256, width=1024, dtype="int16",
                                datasets=file_paths)
 
-        vdsgen.generate_vds("/test/path", files=files, source=source_dict,
+        vdsgen.generate_vds("/test/path", files=files, output="vds.h5",
+                            source=source_dict,
                             data_path="data",
                             stripe_spacing=3, module_spacing=127)
 
-        gen_mock.assert_called_once_with("stripe_",
-                                         ["stripe_1.h5", "stripe_2.h5"])
-        construct_mock.assert_called_once_with(source,
-                                               "/test/path/stripe_vds.h5",
-                                               3, 127)
+        metadata_mock.assert_called_once_with(source,
+                                              "/test/path/vds.h5",
+                                              3, 127)
         create_mock.assert_called_once_with(source,
-                                            construct_mock.return_value,
+                                            metadata_mock.return_value,
                                             "data")
-        h5file_mock.assert_called_once_with("/test/path/stripe_vds.h5", "w",
+        h5file_mock.assert_called_once_with("/test/path/vds.h5", "w",
                                             libver="latest")
         vds_file_mock.create_virtual_dataset.assert_called_once_with(
             VMlist=create_mock.return_value, fill_value=0x1)
@@ -297,7 +298,7 @@ class MainTest(unittest.TestCase):
     @patch(vdsgen_patch_path + '.parse_args',
            return_value=MagicMock(
                path="/test/path", prefix="stripe_", empty=True,
-               files=["file1.hdf5", "file2.hdf5"],
+               files=["file1.hdf5", "file2.hdf5"], output="vds",
                frames=3, height=256, width=2048, data_type="int16",
                data_path="data", stripe_spacing=3, module_spacing=127))
     def test_main_empty(self, parse_mock, generate_mock):
@@ -307,17 +308,19 @@ class MainTest(unittest.TestCase):
 
         parse_mock.assert_called_once_with()
         generate_mock.assert_called_once_with(
-            args_mock.path, args_mock.prefix, args_mock.files,
-            dict(frames=args_mock.frames, height=args_mock.height,
-                 width=args_mock.width, dtype=args_mock.data_type),
-            args_mock.data_path,
-            args_mock.stripe_spacing, args_mock.module_spacing)
+            args_mock.path,
+            prefix=args_mock.prefix, output="vds", files=args_mock.files,
+            source=dict(frames=args_mock.frames, height=args_mock.height,
+                        width=args_mock.width, dtype=args_mock.data_type),
+            data_path=args_mock.data_path,
+            stripe_spacing=args_mock.stripe_spacing,
+            module_spacing=args_mock.module_spacing)
 
     @patch(vdsgen_patch_path + '.generate_vds')
     @patch(vdsgen_patch_path + '.parse_args',
            return_value=MagicMock(
                path="/test/path", prefix="stripe_", empty=False,
-               files=["file1.hdf5", "file2.hdf5"],
+               files=["file1.hdf5", "file2.hdf5"], output="vds",
                frames=3, height=256, width=2048, data_type="int16",
                data_path="data", stripe_spacing=3, module_spacing=127))
     def test_main_not_empty(self, parse_mock, generate_mock):
@@ -327,7 +330,9 @@ class MainTest(unittest.TestCase):
 
         parse_mock.assert_called_once_with()
         generate_mock.assert_called_once_with(
-            args_mock.path, args_mock.prefix, args_mock.files,
-            None,
-            args_mock.data_path,
-            args_mock.stripe_spacing, args_mock.module_spacing)
+            args_mock.path,
+            prefix=args_mock.prefix, output="vds", files=args_mock.files,
+            source=None,
+            data_path=args_mock.data_path,
+            stripe_spacing=args_mock.stripe_spacing,
+            module_spacing=args_mock.module_spacing)
