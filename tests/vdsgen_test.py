@@ -298,17 +298,26 @@ class MainTest(unittest.TestCase):
     def test_generate_vds_no_source_or_files_then_error(self, construct_mock,
                                                         isfile_mock):
 
-        with self.assertRaises(IOError):
+        with self.assertRaises(IOError) as e:
             vdsgen.generate_vds("/test/path", files=["file1", "file2"])
+        self.assertEqual("File /test/path/file1 does not exist. To create VDS "
+                         "from raw files that haven't been created yet, "
+                         "source must be provided.",
+                         e.exception.message)
 
+    @patch('os.path.isfile', return_value=True)
     @patch(h5py_patch_path + '.File', return_value=file_mock)
-    def test_generate_vds_target_node_exists_then_error(self, _):
+    def test_generate_vds_target_node_exists_then_error(self, h5_file_mock,
+                                                        isfile_mock):
         self.file_mock.reset_mock()
-        self.file_mock.get.return_value = None
+        self.file_mock.__enter__.return_value.get.return_value = MagicMock()
 
-        with self.assertRaises(IOError):
+        with self.assertRaises(IOError) as e:
             vdsgen.generate_vds("/test/path", files=["file1", "file2"],
                                 output="vds")
+        self.assertEqual("VDS /test/path/vds already has an entry for node "
+                         "full_frame",
+                         e.exception.message)
 
     @patch(vdsgen_patch_path + '.generate_vds')
     @patch(vdsgen_patch_path + '.parse_args',
