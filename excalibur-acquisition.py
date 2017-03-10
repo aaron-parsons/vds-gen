@@ -9,12 +9,14 @@ from cothread.catools import caget, caput, DBR_CHAR_STR
 
 file_path = "/dls/i14/data/2017/cm16755-1/tmp/excalibur"
 file_name = "stripe"
+output = "test_vds_2.hdf5"
 num_frames = 10
-acquire_time = 10
+acquire_time = 3
 stripe_height = 256
 stripe_width = 2069
 data_type = "int16"
 reset_file_num = False
+target_node = "entry/detector/detector3"
 
 # Shortcuts ###################################################################
 
@@ -63,12 +65,15 @@ VDS_GEN = "/home/mef65357/Detectors/VDS/vds-gen/vdsgen/vdsgen.py"
 EMPTY = "-e"
 FILES = "-f"
 FRAMES = "--frames"
+OUTPUT = "-o"
 STRIPE_SPACING = "-s"
 MODULE_SPACING = "-m"
 DATA_PATH = "-d"
 HEIGHT = "--height"
 WIDTH = "--width"
 DATA_TYPE = "--data_type"
+SOURCE_NODE = "--source_node"
+TARGET_NODE = "--target_node"
 
 # Base arguments
 command = [PYTHON_ANACONDA, VDS_GEN, file_path]
@@ -82,9 +87,15 @@ command += [EMPTY,
 # Override default spacing and data path
 command += [STRIPE_SPACING, "3",
             MODULE_SPACING, "127",
-            DATA_PATH, "entry/data/data"]
+            SOURCE_NODE, "entry/data/data",
+            TARGET_NODE, target_node]
+
+if output is not None:
+    command += [OUTPUT, output]
 
 subprocess.call(command)
+
+sleep(3)
 
 # from vdsgen import generate_vds
 #
