@@ -21,6 +21,8 @@ STRIPE_SPACING = 10              # Pixel spacing between stripes in a module
 MODULE_SPACING = 10              # Pixel spacing between modules
 SOURCE_DATA_NODE = "data"        # Data node in source HDF5 files
 TARGET_DATA_NODE = "full_frame"  # Data node in VDS file
+APPEND = "a"
+OVERWRITE = "w"
 
 
 def parse_args():
@@ -280,6 +282,7 @@ def generate_vds(path, prefix=None, files=None, output=None, source=None,
         module_spacing(int): Spacing between modules
 
     """
+    write_mode = OVERWRITE
     if (prefix is None and files is None) or \
             (prefix is not None and files is not None):
         raise ValueError("One, and only one, of prefix or files required.")
@@ -309,6 +312,8 @@ def generate_vds(path, prefix=None, files=None, output=None, source=None,
                 raise IOError("VDS {file} already has an entry for node "
                               "{node}".format(file=output_file,
                                               node=target_node))
+            else:
+                write_mode = APPEND
 
     file_names = [file_.split('/')[-1] for file_ in file_paths]
     logging.info("Combining datasets %s into %s",
@@ -332,7 +337,7 @@ def generate_vds(path, prefix=None, files=None, output=None, source=None,
                                source_node, target_node)
 
     logging.info("Creating VDS at %s", output_file)
-    with h5.File(output_file, "w", libver="latest") as vds_file:
+    with h5.File(output_file, write_mode, libver="latest") as vds_file:
         validate_node(vds_file, target_node)
         vds_file.create_virtual_dataset(VMlist=map_list, fill_value=0x1)
 
