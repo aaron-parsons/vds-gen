@@ -1,7 +1,7 @@
 import sys
 from argparse import ArgumentParser
 
-from vdsgen import VDSGenerator
+from vdsgenerator import VDSGenerator
 
 
 def parse_args():

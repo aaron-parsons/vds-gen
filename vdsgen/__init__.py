@@ -1,4 +1,4 @@
 """Make VDSGenerator easy to import."""
-from vdsgen import VDSGenerator
+from vdsgenerator import VDSGenerator
 
 __all__ = ["VDSGenerator"]
