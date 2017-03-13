@@ -1,17 +1,34 @@
+import os
+import sys
 import unittest
 
 from pkg_resources import require
 require("mock")
-from mock import MagicMock, patch, ANY, call
+from mock import MagicMock, patch, call
+
+from vdsgen import vdsgen
+from vdsgen.vdsgen import VDSGenerator
+
 vdsgen_patch_path = "vdsgen.vdsgen"
+VDSGenerator_patch_path = vdsgen_patch_path + ".VDSGenerator"
 parser_patch_path = "argparse.ArgumentParser"
 h5py_patch_path = "h5py"
 
-import os
-import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "h5py"))
 
-from vdsgen import vdsgen
+
+class VDSGeneratorTester(VDSGenerator):
+
+    """A version of VDSGenerator without initialisation.
+
+    For testing single methods of the class. Must have required attributes
+    passed before calling testee function.
+
+    """
+
+    def __init__(self, **kwargs):
+        for attribute, value in kwargs.items():
+            self.__setattr__(attribute, value)
 
 
 class ParseArgsTest(unittest.TestCase):
@@ -60,8 +77,7 @@ class ParseArgsTest(unittest.TestCase):
              call("--width", type=int, default=1024, dest="width",
                   help="Width of raw datasets."),
              call("--data_type", type=str, default="uint16", dest="data_type",
-                  help="Data type of raw datasets.")]
-        )
+                  help="Data type of raw datasets.")])
 
         add_exclusive_group_mock.assert_called_with(required=True)
         exclusive_group_mock.add_argument.assert_has_calls(
@@ -71,8 +87,7 @@ class ParseArgsTest(unittest.TestCase):
                        "located at <path>."),
              call("-f", "--files", nargs="*", type=str, default=None,
                   dest="files",
-                  help="Manually define files to combine.")]
-        )
+                  help="Manually define files to combine.")])
 
         parse_mock.assert_called_once_with()
         self.assertEqual(parse_mock.return_value, args)
@@ -98,7 +113,93 @@ class ParseArgsTest(unittest.TestCase):
             "Must define at least two files to combine.")
 
 
+class VDSGeneratorInitTest(unittest.TestCase):
+
+    @patch('os.path.isfile', return_value=True)
+    @patch(VDSGenerator_patch_path + '.process_source_datasets')
+    @patch(VDSGenerator_patch_path + '.construct_vds_name',
+           return_value="stripe_vds.hdf5")
+    @patch(VDSGenerator_patch_path + '.find_files',
+           return_value=["/test/path/stripe_1.hdf5",
+                         "/test/path/stripe_2.hdf5",
+                         "/test/path/stripe_3.hdf5"])
+    def test_generate_vds_defaults(self, find_mock, construct_mock,
+                                   process_mock, isfile_mock):
+        expected_files = ["stripe_1.hdf5", "stripe_2.hdf5", "stripe_3.hdf5"]
+
+        gen = VDSGenerator("/test/path", prefix="stripe_")
+
+        find_mock.assert_called_once_with()
+        construct_mock.assert_called_once_with(expected_files)
+        process_mock.assert_called_once_with()
+
+        self.assertEqual("/test/path", gen.path)
+        self.assertEqual("stripe_", gen.prefix)
+        self.assertEqual("stripe_vds.hdf5", gen.name)
+        self.assertEqual(find_mock.return_value, gen.datasets)
+        self.assertEqual(process_mock.return_value, gen.source_metadata)
+        self.assertEqual("data", gen.source_node)
+        self.assertEqual("full_frame", gen.target_node)
+        self.assertEqual(10, gen.stripe_spacing)
+        self.assertEqual(10, gen.module_spacing)
+        self.assertEqual(gen.CREATE, gen.mode)
+
+    def test_generate_vds_given_args(self):
+        files = ["stripe_1.h5", "stripe_2.h5"]
+        file_paths = ["/test/path/" + file_ for file_ in files]
+        source_dict = dict(frames=3, height=256, width=2048, dtype="int16")
+        source = vdsgen.Source(frames=3, height=256, width=2048, dtype="int16")
+
+        gen = VDSGenerator("/test/path",
+                           files=files,
+                           output="vds.hdf5",
+                           source=source_dict,
+                           source_node="entry/data/data",
+                           target_node="entry/detector/detector1",
+                           stripe_spacing=3, module_spacing=127)
+
+        self.assertEqual("/test/path", gen.path)
+        self.assertEqual("stripe_", gen.prefix)
+        self.assertEqual("vds.hdf5", gen.name)
+        self.assertEqual(file_paths, gen.datasets)
+        self.assertEqual(source, gen.source_metadata)
+        self.assertEqual("entry/data/data", gen.source_node)
+        self.assertEqual("entry/detector/detector1", gen.target_node)
+        self.assertEqual(3, gen.stripe_spacing)
+        self.assertEqual(127, gen.module_spacing)
+        self.assertEqual(gen.CREATE, gen.mode)
+
+    def test_generate_vds_prefix_and_files_then_error(self):
+        files = ["stripe_1.h5", "stripe_2.h5"]
+        source_dict = dict(frames=3, height=256, width=2048, dtype="int16")
+
+        with self.assertRaises(ValueError):
+            VDSGenerator("/test/path",
+                         prefix="stripe_", files=files,
+                         output="vds.hdf5",
+                         source=source_dict,
+                         source_node="entry/data/data",
+                         target_node="entry/detector/detector1",
+                         stripe_spacing=3, module_spacing=127)
+
+    @patch('os.path.isfile', return_value=False)
+    def test_generate_vds_no_source_or_files_then_error(self, _):
+
+        with self.assertRaises(IOError) as e:
+            VDSGenerator("/test/path",
+                         files=["file1", "file2"],
+                         output="vds.hdf5")
+
+        self.assertEqual("File /test/path/file1 does not exist. To create VDS "
+                         "from raw files that haven't been created yet, "
+                         "source must be provided.",
+                         e.exception.message)
+
+
 class FindFilesTest(unittest.TestCase):
+
+    def setUp(self):
+        self.gen = VDSGeneratorTester(path="/test/path", prefix="stripe_")
 
     @patch('os.listdir',
            return_value=["stripe_1.h5", "stripe_2.h5", "stripe_3.h5",
@@ -108,7 +209,7 @@ class FindFilesTest(unittest.TestCase):
                           "/test/path/stripe_3.h5", "/test/path/stripe_4.h5",
                           "/test/path/stripe_5.h5", "/test/path/stripe_6.h5"]
 
-        files = vdsgen.find_files("/test/path", "stripe_")
+        files = self.gen.find_files()
 
         self.assertEqual(expected_files, files)
 
@@ -120,7 +221,7 @@ class FindFilesTest(unittest.TestCase):
                           "/test/path/stripe_3.h5", "/test/path/stripe_4.h5",
                           "/test/path/stripe_5.h5", "/test/path/stripe_6.h5"]
 
-        files = vdsgen.find_files("/test/path", "stripe_")
+        files = self.gen.find_files()
 
         self.assertEqual(expected_files, files)
 
@@ -128,23 +229,24 @@ class FindFilesTest(unittest.TestCase):
     def test_given_one_file_then_error(self, _):
 
         with self.assertRaises(IOError):
-            vdsgen.find_files("/test/path", "stripe_")
+            self.gen.find_files()
 
     @patch('os.listdir', return_value=[])
     def test_given_no_files_then_error(self, _):
 
         with self.assertRaises(IOError):
-            vdsgen.find_files("/test/path", "stripe_")
+            self.gen.find_files()
 
 
 class SimpleFunctionsTest(unittest.TestCase):
 
     def test_generate_vds_name(self):
+        gen = VDSGeneratorTester(prefix="stripe_")
         expected_name = "stripe_vds.h5"
         files = ["stripe_1.h5", "stripe_2.h5", "stripe_3.h5",
                  "stripe_4.h5", "stripe_5.h5", "stripe_6.h5"]
 
-        vds_name = vdsgen.construct_vds_name("stripe_", files)
+        vds_name = gen.construct_vds_name(files)
 
         self.assertEqual(expected_name, vds_name)
 
@@ -152,47 +254,47 @@ class SimpleFunctionsTest(unittest.TestCase):
 
     @patch(h5py_patch_path + '.File', return_value=mock_data)
     def test_grab_metadata(self, h5file_mock):
+        gen = VDSGeneratorTester(source_node="data")
         expected_data = dict(frames=3, height=256, width=2048, dtype="uint16")
 
-        meta_data = vdsgen.grab_metadata("/test/path", "data")
+        meta_data = gen.grab_metadata("/test/path/stripe.hdf5")
 
-        h5file_mock.assert_called_once_with("/test/path", "r")
+        h5file_mock.assert_called_once_with("/test/path/stripe.hdf5", "r")
         self.assertEqual(expected_data, meta_data)
 
-    @patch(vdsgen_patch_path + '.grab_metadata',
+    @patch(VDSGenerator_patch_path + '.grab_metadata',
            return_value=dict(frames=3, height=256, width=2048, dtype="uint16"))
     def test_process_source_datasets_given_valid_data(self, grab_mock):
-        files = ["stripe_1.h5", "stripe_2.h5"]
+        gen = VDSGeneratorTester(datasets=["stripe_1.h5", "stripe_2.h5"])
         expected_source = vdsgen.Source(frames=3, height=256, width=2048,
-                                        dtype="uint16", datasets=files)
+                                        dtype="uint16")
 
-        source = vdsgen.process_source_datasets(files, "data")
+        source = gen.process_source_datasets()
 
-        grab_mock.assert_has_calls([call("stripe_1.h5", "data"),
-                                    call("stripe_2.h5", "data")])
+        grab_mock.assert_has_calls([call("stripe_1.h5"), call("stripe_2.h5")])
         self.assertEqual(expected_source, source)
 
-    @patch(vdsgen_patch_path + '.grab_metadata',
+    @patch(VDSGenerator_patch_path + '.grab_metadata',
            side_effect=[dict(frames=3, height=256, width=2048, dtype="uint16"),
                         dict(frames=4, height=256, width=2048,
                              dtype="uint16")])
     def test_process_source_datasets_given_mismatched_data(self, grab_mock):
-        files = ["stripe_1.h5", "stripe_2.h5"]
+        gen = VDSGeneratorTester(datasets=["stripe_1.h5", "stripe_2.h5"])
 
         with self.assertRaises(ValueError):
-            vdsgen.process_source_datasets(files, "data")
+            gen.process_source_datasets()
 
-        grab_mock.assert_has_calls([call("stripe_1.h5", "data"),
-                                    call("stripe_2.h5", "data")])
+        grab_mock.assert_has_calls([call("stripe_1.h5"), call("stripe_2.h5")])
 
     def test_construct_vds_metadata(self):
+        gen = VDSGeneratorTester(datasets=[""] * 6, stripe_spacing=10,
+                                 module_spacing=100)
         source = vdsgen.Source(frames=3, height=256, width=2048,
-                               dtype="uint16", datasets=[""]*6)
-        expected_vds = vdsgen.VDS(shape=(3, 1586, 2048),
-                                  spacing=[10] * 5 + [0],
-                                  path="/test/path")
+                               dtype="uint16")
+        expected_vds = vdsgen.VDS(shape=(3, 1766, 2048),
+                                  spacing=[10, 100, 10, 100, 10, 0])
 
-        vds = vdsgen.construct_vds_metadata(source, "/test/path")
+        vds = gen.construct_vds_metadata(source)
 
         self.assertEqual(expected_vds, vds)
 
@@ -200,21 +302,26 @@ class SimpleFunctionsTest(unittest.TestCase):
     @patch(h5py_patch_path + '.VirtualSource')
     @patch(h5py_patch_path + '.VirtualTarget')
     def test_create_vds_maps(self, target_mock, source_mock, map_mock):
+        gen = VDSGeneratorTester(output_file= "/test/path/vds.hdf5",
+                                 stripe_spacing=10, module_spacing=100,
+                                 target_node="full_frame", source_node="data",
+                                 datasets=["source"] * 6)
         source = vdsgen.Source(frames=3, height=256, width=2048,
-                               dtype="uint16", datasets=["source"]*6)
-        vds = vdsgen.VDS(shape=(3, 1586, 2048), spacing=[10] * 5 + [0],
-                         path="/test/path")
+                               dtype="uint16")
+        vds = vdsgen.VDS(shape=(3, 1586, 2048), spacing=[10] * 5 + [0])
 
-        map_list = vdsgen.create_vds_maps(source, vds, "data", "full_frame")
+        map_list = gen.create_vds_maps(source, vds)
 
-        target_mock.assert_called_once_with("/test/path", "full_frame",
+        target_mock.assert_called_once_with("/test/path/vds.hdf5",
+                                            "full_frame",
                                             shape=(3, 1586, 2048))
         source_mock.assert_has_calls([call("source", "data",
-                                           shape=(3, 256, 2048))]*6)
+                                           shape=(3, 256, 2048))] * 6)
         # TODO: Improve this assert by passing numpy arrays to check slicing
-        map_mock.assert_has_calls([call(source_mock.return_value,
-                                        target_mock.return_value.__getitem__.return_value,
-                                        dtype="uint16")]*6)
+        map_mock.assert_has_calls([
+            call(source_mock.return_value,
+                 target_mock.return_value.__getitem__.return_value,
+                 dtype="uint16")]*6)
         self.assertEqual([map_mock.return_value]*6, map_list)
 
 
@@ -224,136 +331,126 @@ class ValidateNodeTest(unittest.TestCase):
         self.file_mock = MagicMock()
 
     def test_validate_node_creates(self):
+        gen = VDSGeneratorTester(target_node="entry/detector/detector1")
         self.file_mock.get.return_value = None
 
-        vdsgen.validate_node(self.file_mock, "entry/detector/detector1")
+        gen.validate_node(self.file_mock)
 
         self.file_mock.create_group.assert_called_once_with("entry/detector")
 
     def test_validate_node_exists_then_no_op(self):
+        gen = VDSGeneratorTester(target_node="entry/detector/detector1")
         self.file_mock.get.return_value = "Group"
 
-        vdsgen.validate_node(self.file_mock, "entry/detector/detector1")
+        gen.validate_node(self.file_mock)
 
         self.file_mock.create_group.assert_not_called()
 
     def test_validate_node_invalid_then_error(self):
 
+        gen = VDSGeneratorTester(target_node="/entry/detector/detector1")
         with self.assertRaises(ValueError):
-            vdsgen.validate_node(self.file_mock, "/entry/detector/detector1")
+            gen.validate_node(self.file_mock)
+
+        gen = VDSGeneratorTester(target_node="entry/detector/detector1/")
         with self.assertRaises(ValueError):
-            vdsgen.validate_node(self.file_mock, "entry/detector/detector1/")
+            gen.validate_node(self.file_mock)
+
+        gen = VDSGeneratorTester(target_node="/entry/detector/detector1/")
         with self.assertRaises(ValueError):
-            vdsgen.validate_node(self.file_mock, "/entry/detector/detector1/")
+            gen.validate_node(self.file_mock)
+
+
+class GenerateVDSTest(unittest.TestCase):
+
+    file_mock = MagicMock()
+
+    @patch('os.path.isfile', return_value=False)
+    @patch(VDSGenerator_patch_path + '.validate_node')
+    @patch(h5py_patch_path + '.File', return_value=file_mock)
+    @patch(VDSGenerator_patch_path + '.create_vds_maps')
+    @patch(VDSGenerator_patch_path + '.construct_vds_metadata')
+    def test_generate_vds_create(self, construct_mock, create_mock,
+                                 h5file_mock, validate_mock, isfile_mock):
+        source_mock = MagicMock()
+        gen = VDSGeneratorTester(path="/test/path", prefix="stripe_",
+                                 output_file="/test/path/vds.hdf5",
+                                 name="vds.hdf5",
+                                 target_node="full_frame", source_node="data",
+                                 datasets=["stripe_1.hdf5", "stripe_2.hdf5",
+                                           "stripe_3.hdf5"],
+                                 source_metadata=source_mock)
+        self.file_mock.reset_mock()
+        vds_file_mock = self.file_mock.__enter__.return_value
+        vds_file_mock.get.return_value = None
+
+        gen.generate_vds()
+
+        isfile_mock.assert_called_once_with("/test/path/vds.hdf5")
+        construct_mock.assert_called_once_with(source_mock)
+        create_mock.assert_called_once_with(source_mock,
+                                            construct_mock.return_value)
+        validate_mock.assert_called_once_with(vds_file_mock)
+        h5file_mock.assert_called_once_with(
+            "/test/path/vds.hdf5", "w", libver="latest")
+        vds_file_mock.create_virtual_dataset.assert_called_once_with(
+            VMlist=create_mock.return_value, fill_value=0x1)
+
+    @patch('os.path.isfile', return_value=True)
+    @patch(VDSGenerator_patch_path + '.validate_node')
+    @patch(h5py_patch_path + '.File', return_value=file_mock)
+    @patch(VDSGenerator_patch_path + '.create_vds_maps')
+    @patch(VDSGenerator_patch_path + '.construct_vds_metadata')
+    def test_generate_vds_append(self, construct_mock, create_mock,
+                                 h5file_mock, validate_mock, isfile_mock):
+        source_mock = MagicMock()
+        gen = VDSGeneratorTester(path="/test/path", prefix="stripe_",
+                                 output_file="/test/path/vds.hdf5",
+                                 name="vds.hdf5",
+                                 target_node="full_frame", source_node="data",
+                                 datasets=["stripe_1.hdf5", "stripe_2.hdf5",
+                                           "stripe_3.hdf5"],
+                                 source_metadata=source_mock)
+        self.file_mock.reset_mock()
+        vds_file_mock = self.file_mock.__enter__.return_value
+        vds_file_mock.get.return_value = None
+
+        gen.generate_vds()
+
+        isfile_mock.assert_called_once_with("/test/path/vds.hdf5")
+        construct_mock.assert_called_once_with(source_mock)
+        create_mock.assert_called_once_with(source_mock,
+                                            construct_mock.return_value)
+        validate_mock.assert_called_once_with(vds_file_mock)
+        h5file_mock.assert_has_calls([
+            call("/test/path/vds.hdf5", "r", libver="latest"),
+            call("/test/path/vds.hdf5", "a", libver="latest")])
+        vds_file_mock.create_virtual_dataset.assert_called_once_with(
+            VMlist=create_mock.return_value, fill_value=0x1)
+
+    @patch('os.path.isfile', return_value=True)
+    @patch(h5py_patch_path + '.File', return_value=file_mock)
+    def test_generate_vds_node_exists_then_error(self, h5file_mock,
+                                                 isfile_mock):
+        source_mock = MagicMock()
+        gen = VDSGeneratorTester(path="/test/path", prefix="stripe_",
+                                 output_file="/test/path/vds.hdf5",
+                                 name="vds.hdf5",
+                                 target_node="full_frame", source_node="data",
+                                 datasets=["stripe_1.hdf5", "stripe_2.hdf5",
+                                           "stripe_3.hdf5"],
+                                 source_metadata=source_mock)
+        self.file_mock.reset_mock()
+        vds_file_mock = self.file_mock.__enter__.return_value
+        vds_file_mock.get.return_value = "Group"
+
+        with self.assertRaises(IOError):
+            gen.generate_vds()
 
 
 class MainTest(unittest.TestCase):
 
-    file_mock = MagicMock()
-    file_mock_2 = MagicMock()
-
-    @patch('os.path.isfile', side_effect=[False, True, True, True])
-    @patch(vdsgen_patch_path + '.validate_node')
-    @patch(h5py_patch_path + '.File', return_value=file_mock)
-    @patch(vdsgen_patch_path + '.create_vds_maps')
-    @patch(vdsgen_patch_path + '.construct_vds_metadata')
-    @patch(vdsgen_patch_path + '.process_source_datasets')
-    @patch(vdsgen_patch_path + '.construct_vds_name',
-           return_value="stripe_vds.h5")
-    @patch(vdsgen_patch_path + '.find_files',
-           return_value=["stripe_1.hdf5", "stripe_2.hdf5", "stripe_3.hdf5"])
-    def test_generate_vds_defaults(self, find_mock, gen_mock, process_mock,
-                                   construct_mock, create_mock, h5file_mock,
-                                   validate_mock, isfile_mock):
-        self.file_mock.reset_mock()
-        vds_file_mock = self.file_mock.__enter__.return_value
-
-        vdsgen.generate_vds("/test/path", prefix="stripe_")
-
-        find_mock.assert_called_once_with("/test/path", "stripe_")
-        gen_mock.assert_called_once_with("stripe_", find_mock.return_value)
-        process_mock.assert_called_once_with(find_mock.return_value, "data")
-        construct_mock.assert_called_once_with(process_mock.return_value,
-                                               "/test/path/stripe_vds.h5",
-                                               None, None)
-        create_mock.assert_called_once_with(process_mock.return_value,
-                                            construct_mock.return_value,
-                                            "data", "full_frame")
-        validate_mock.assert_called_once_with(vds_file_mock, "full_frame")
-        h5file_mock.assert_called_once_with("/test/path/stripe_vds.h5", "w",
-                                            libver="latest")
-        vds_file_mock.create_virtual_dataset.assert_called_once_with(
-            VMlist=create_mock.return_value, fill_value=0x1)
-
-    @patch('os.path.isfile', return_value=True)
-    @patch(vdsgen_patch_path + '.validate_node')
-    @patch(h5py_patch_path + '.File', side_effect=[file_mock, file_mock_2])
-    @patch(vdsgen_patch_path + '.create_vds_maps')
-    @patch(vdsgen_patch_path + '.construct_vds_metadata')
-    def test_generate_vds_given_args(self, metadata_mock,
-                                     create_mock, h5file_mock, validate_mock,
-                                     isfile_mock):
-        self.file_mock.reset_mock()
-        self.file_mock_2.reset_mock()
-        self.file_mock.__enter__.return_value.get.return_value = None
-        vds_file_mock = self.file_mock_2.__enter__.return_value
-        files = ["stripe_1.h5", "stripe_2.h5"]
-        file_paths = ["/test/path/" + file_ for file_ in files]
-        source_dict = dict(frames=3, height=256, width=1024, dtype="int16")
-        source = vdsgen.Source(frames=3, height=256, width=1024, dtype="int16",
-                               datasets=file_paths)
-
-        vdsgen.generate_vds("/test/path", files=files, output="vds.h5",
-                            source=source_dict,
-                            source_node="data", target_node="full_frame",
-                            stripe_spacing=3, module_spacing=127)
-
-        metadata_mock.assert_called_once_with(source,
-                                              "/test/path/vds.h5",
-                                              3, 127)
-        create_mock.assert_called_once_with(source,
-                                            metadata_mock.return_value,
-                                            "data", "full_frame")
-        validate_mock.assert_called_once_with(vds_file_mock, "full_frame")
-        h5file_mock.assert_has_calls([
-            call("/test/path/vds.h5", "r", libver="latest"),
-            call("/test/path/vds.h5", "a", libver="latest")])
-        vds_file_mock.create_virtual_dataset.assert_called_once_with(
-            VMlist=create_mock.return_value, fill_value=0x1)
-
-    def test_generate_vds_prefix_and_files_then_error(self):
-
-        with self.assertRaises(ValueError):
-            vdsgen.generate_vds("/test/path", "stripe_", ["file1", "file2"])
-
-    @patch('os.path.isfile', return_value=False)
-    @patch(vdsgen_patch_path + '.construct_vds_name',
-           return_value="stripe_vds.h5")
-    def test_generate_vds_no_source_or_files_then_error(self, construct_mock,
-                                                        isfile_mock):
-
-        with self.assertRaises(IOError) as e:
-            vdsgen.generate_vds("/test/path", files=["file1", "file2"])
-        self.assertEqual("File /test/path/file1 does not exist. To create VDS "
-                         "from raw files that haven't been created yet, "
-                         "source must be provided.",
-                         e.exception.message)
-
-    @patch('os.path.isfile', return_value=True)
-    @patch(h5py_patch_path + '.File', return_value=file_mock)
-    def test_generate_vds_target_node_exists_then_error(self, h5_file_mock,
-                                                        isfile_mock):
-        self.file_mock.reset_mock()
-        self.file_mock.__enter__.return_value.get.return_value = MagicMock()
-
-        with self.assertRaises(IOError) as e:
-            vdsgen.generate_vds("/test/path", files=["file1", "file2"],
-                                output="vds")
-        self.assertEqual("VDS /test/path/vds already has an entry for node "
-                         "full_frame",
-                         e.exception.message)
-
-    @patch(vdsgen_patch_path + '.generate_vds')
+    @patch(VDSGenerator_patch_path)
     @patch(vdsgen_patch_path + '.parse_args',
            return_value=MagicMock(
                path="/test/path", prefix="stripe_", empty=True,
@@ -361,15 +458,17 @@ class MainTest(unittest.TestCase):
                frames=3, height=256, width=2048, data_type="int16",
                source_node="data", target_node="full_frame",
                stripe_spacing=3, module_spacing=127))
-    def test_main_empty(self, parse_mock, generate_mock):
+    def test_main_empty(self, parse_mock, init_mock):
+        gen_mock = init_mock.return_value
         args_mock = parse_mock.return_value
 
         vdsgen.main()
 
         parse_mock.assert_called_once_with()
-        generate_mock.assert_called_once_with(
+        init_mock.assert_called_once_with(
             args_mock.path,
-            prefix=args_mock.prefix, output="vds", files=args_mock.files,
+            prefix=args_mock.prefix, files=args_mock.files,
+            output=args_mock.output,
             source=dict(frames=args_mock.frames, height=args_mock.height,
                         width=args_mock.width, dtype=args_mock.data_type),
             source_node=args_mock.source_node,
@@ -377,7 +476,9 @@ class MainTest(unittest.TestCase):
             stripe_spacing=args_mock.stripe_spacing,
             module_spacing=args_mock.module_spacing)
 
-    @patch(vdsgen_patch_path + '.generate_vds')
+        gen_mock.generate_vds.assert_called_once_with()
+
+    @patch(VDSGenerator_patch_path)
     @patch(vdsgen_patch_path + '.parse_args',
            return_value=MagicMock(
                path="/test/path", prefix="stripe_", empty=False,
