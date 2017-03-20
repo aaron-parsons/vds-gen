@@ -31,14 +31,9 @@ def parse_args():
         help="Make empty VDS pointing to datasets that don't exist, yet.")
     source_metadata = parser.add_argument_group()
     source_metadata.add_argument(
-        "--frames", type=int, default=1, dest="frames",
-        help="Number of frames to combine into VDS.")
-    source_metadata.add_argument(
-        "--height", type=int, default=256, dest="height",
-        help="Height of raw datasets.")
-    source_metadata.add_argument(
-        "--width", type=int, default=1024, dest="width",
-        help="Width of raw datasets.")
+        "--shape", type=int, nargs="*", default=[1, 256, 2048], dest="shape",
+        help="Shape of dataset - 'frames height width', where frames is N "
+             "dimensional.")
     source_metadata.add_argument(
         "--data_type", type=str, default="uint16", dest="data_type",
         help="Data type of raw datasets.")
@@ -58,6 +53,7 @@ def parse_args():
                         help="Data node in VDS file.")
 
     args = parser.parse_args()
+    args.shape = tuple(args.shape)
 
     if args.empty and args.files is None:
         parser.error(
@@ -74,8 +70,7 @@ def main():
     args = parse_args()
 
     if args.empty:
-        source_metadata = dict(frames=args.frames, height=args.height,
-                               width=args.width, dtype=args.data_type)
+        source_metadata = dict(shape=args.shape, dtype=args.data_type)
     else:
         source_metadata = None
 

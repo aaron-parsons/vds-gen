@@ -50,12 +50,10 @@ class ParseArgsTest(unittest.TestCase):
 
         add_group_mock.assert_called_with()
         group_mock.add_argument.assert_has_calls(
-            [call("--frames", type=int, default=1, dest="frames",
-                  help="Number of frames to combine into VDS."),
-             call("--height", type=int, default=256, dest="height",
-                  help="Height of raw datasets."),
-             call("--width", type=int, default=1024, dest="width",
-                  help="Width of raw datasets."),
+            [call("--shape", type=int, nargs="*", default=[1, 256, 2048],
+                  dest="shape",
+                  help="Shape of dataset - 'frames height width', where "
+                       "frames is N dimensional."),
              call("--data_type", type=str, default="uint16", dest="data_type",
                   help="Data type of raw datasets.")])
 
@@ -100,7 +98,7 @@ class MainTest(unittest.TestCase):
            return_value=MagicMock(
                path="/test/path", prefix="stripe_", empty=True,
                files=["file1.hdf5", "file2.hdf5"], output="vds",
-               frames=3, height=256, width=2048, data_type="int16",
+               shape=[3, 256, 2048], data_type="int16",
                source_node="data", target_node="full_frame",
                stripe_spacing=3, module_spacing=127))
     def test_main_empty(self, parse_mock, init_mock):
@@ -114,8 +112,7 @@ class MainTest(unittest.TestCase):
             args_mock.path,
             prefix=args_mock.prefix, files=args_mock.files,
             output=args_mock.output,
-            source=dict(frames=args_mock.frames, height=args_mock.height,
-                        width=args_mock.width, dtype=args_mock.data_type),
+            source=dict(shape=args_mock.shape, dtype=args_mock.data_type),
             source_node=args_mock.source_node,
             target_node=args_mock.target_node,
             stripe_spacing=args_mock.stripe_spacing,

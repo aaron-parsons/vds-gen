@@ -2,7 +2,6 @@
 """A CLI tool for generating virtual datasets from individual HDF5 files."""
 
 import os
-import sys
 import re
 import logging
 
@@ -23,6 +22,7 @@ class VDSGenerator(object):
     # Constants
     CREATE = "w"  # Will overwrite any existing file
     APPEND = "a"
+    FULL_SLICE = slice(None)
 
     # Default Values
     stripe_spacing = 10  # Pixel spacing between stripes in a module
@@ -92,11 +92,30 @@ class VDSGenerator(object):
             self.source_metadata = self.process_source_datasets()
         # Else, store given source metadata
         else:
+            frames, height, width = self.parse_shape(source['shape'])
             self.source_metadata = Source(
-                frames=source['frames'], height=source['height'],
-                width=source['width'], dtype=source['dtype'])
+                frames=frames, height=height, width=width,
+                dtype=source['dtype'])
 
         self.output_file = os.path.abspath(os.path.join(self.path, self.name))
+
+    @staticmethod
+    def parse_shape(shape):
+        """Split shape into height, width and frames.
+
+        Args:
+            shape(tuple): Shape of dataset
+
+        Returns:
+            frames, height, width
+
+        """
+        # The last two elements of shape are the height and width of the image
+        height, width = shape[-2:]
+        # Everything before that is the frames for each axis
+        frames = shape[:-2]
+
+        return frames, height, width
 
     def generate_vds(self):
         """Generate a virtual dataset."""
@@ -174,7 +193,7 @@ class VDSGenerator(object):
 
         """
         h5_data = h5.File(file_path, 'r')[self.source_node]
-        frames, height, width = h5_data.shape
+        frames, height, width = self.parse_shape(h5_data.shape)
         data_type = h5_data.dtype
 
         return dict(frames=frames, height=height, width=width, dtype=data_type)
@@ -218,7 +237,7 @@ class VDSGenerator(object):
         spacing[-1] = 0
 
         height = (source.height * stripes) + sum(spacing)
-        shape = (source.frames, height, source.width)
+        shape = source.frames + (height, source.width)
 
         return VDS(shape=shape, spacing=spacing)
 
@@ -233,7 +252,7 @@ class VDSGenerator(object):
             list(VirtualMap): Maps describing links between raw data and VDS
 
         """
-        source_shape = (source.frames, source.height, source.width)
+        source_shape = source.frames + (source.height, source.width)
         vds = h5.VirtualTarget(self.output_file, self.target_node,
                                shape=vds_data.shape)
 
@@ -249,7 +268,9 @@ class VDSGenerator(object):
             stop = start + source.height + vds_data.spacing[idx]
             current_position = stop
 
-            v_target = vds[:, start:stop, :]
+            index = tuple([self.FULL_SLICE] * len(source.frames) +
+                          [slice(start, stop)] + [self.FULL_SLICE])
+            v_target = vds[index]
             v_map = h5.VirtualMap(v_source, v_target, dtype=source.dtype)
             map_list.append(v_map)
 

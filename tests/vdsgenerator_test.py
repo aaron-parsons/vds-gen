@@ -64,8 +64,9 @@ class VDSGeneratorInitTest(unittest.TestCase):
     def test_generate_vds_given_args(self):
         files = ["stripe_1.h5", "stripe_2.h5"]
         file_paths = ["/test/path/" + file_ for file_ in files]
-        source_dict = dict(frames=3, height=256, width=2048, dtype="int16")
-        source = vdsgenerator.Source(frames=3, height=256, width=2048, dtype="int16")
+        source_dict = dict(shape=(3, 256, 2048), dtype="int16")
+        source = vdsgenerator.Source(frames=(3,), height=256, width=2048,
+                                     dtype="int16")
 
         gen = VDSGenerator("/test/path",
                            files=files,
@@ -172,7 +173,7 @@ class SimpleFunctionsTest(unittest.TestCase):
     @patch(h5py_patch_path + '.File', return_value=mock_data)
     def test_grab_metadata(self, h5file_mock):
         gen = VDSGeneratorTester(source_node="data")
-        expected_data = dict(frames=3, height=256, width=2048, dtype="uint16")
+        expected_data = dict(frames=(3,), height=256, width=2048, dtype="uint16")
 
         meta_data = gen.grab_metadata("/test/path/stripe.hdf5")
 
@@ -180,10 +181,11 @@ class SimpleFunctionsTest(unittest.TestCase):
         self.assertEqual(expected_data, meta_data)
 
     @patch(VDSGenerator_patch_path + '.grab_metadata',
-           return_value=dict(frames=3, height=256, width=2048, dtype="uint16"))
+           return_value=dict(frames=(3,), height=256, width=2048, dtype="uint16"))
     def test_process_source_datasets_given_valid_data(self, grab_mock):
         gen = VDSGeneratorTester(datasets=["stripe_1.h5", "stripe_2.h5"])
-        expected_source = vdsgenerator.Source(frames=3, height=256, width=2048,
+        expected_source = vdsgenerator.Source(frames=(3,), height=256,
+                                              width=2048,
                                               dtype="uint16")
 
         source = gen.process_source_datasets()
@@ -206,7 +208,7 @@ class SimpleFunctionsTest(unittest.TestCase):
     def test_construct_vds_metadata(self):
         gen = VDSGeneratorTester(datasets=[""] * 6, stripe_spacing=10,
                                  module_spacing=100)
-        source = vdsgenerator.Source(frames=3, height=256, width=2048,
+        source = vdsgenerator.Source(frames=(3,), height=256, width=2048,
                                      dtype="uint16")
         expected_vds = vdsgenerator.VDS(shape=(3, 1766, 2048),
                                         spacing=[10, 100, 10, 100, 10, 0])
@@ -223,7 +225,7 @@ class SimpleFunctionsTest(unittest.TestCase):
                                  stripe_spacing=10, module_spacing=100,
                                  target_node="full_frame", source_node="data",
                                  datasets=["source"] * 6)
-        source = vdsgenerator.Source(frames=3, height=256, width=2048,
+        source = vdsgenerator.Source(frames=(3,), height=256, width=2048,
                                      dtype="uint16")
         vds = vdsgenerator.VDS(shape=(3, 1586, 2048), spacing=[10] * 5 + [0])
 
