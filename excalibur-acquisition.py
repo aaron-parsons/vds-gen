@@ -1,3 +1,4 @@
+import os
 from time import sleep
 import subprocess
 
@@ -9,14 +10,14 @@ from cothread.catools import caget, caput, DBR_CHAR_STR
 
 file_path = "/dls/i14/data/2017/cm16755-1/tmp/excalibur"
 file_name = "stripe"
-output = "test_vds_2.hdf5"
+output = "test_vds_4.hdf5"
 num_frames = 10
 acquire_time = 3
 stripe_height = 256
 stripe_width = 2069
 data_type = "int16"
 reset_file_num = False
-target_node = "entry/detector/detector3"
+target_node = "entry/detector/detector"
 
 # Shortcuts ###################################################################
 
@@ -61,16 +62,14 @@ files = ["{prefix}{fem}.hdf5".format(prefix=file_prefix, fem=fem)
          for fem in FEMS]
 
 PYTHON_ANACONDA = "/dls_sw/apps/python/anaconda/1.7.0/64/bin/python"
-VDS_GEN = "/home/mef65357/Detectors/VDS/vds-gen/vdsgen/vdsgen.py"
+VDS_GEN = "/home/mef65357/Detectors/VDS/vds-gen/vdsgen/app.py"
 EMPTY = "-e"
 FILES = "-f"
-FRAMES = "--frames"
+SHAPE = "--shape"
 OUTPUT = "-o"
 STRIPE_SPACING = "-s"
 MODULE_SPACING = "-m"
 DATA_PATH = "-d"
-HEIGHT = "--height"
-WIDTH = "--width"
 DATA_TYPE = "--data_type"
 SOURCE_NODE = "--source_node"
 TARGET_NODE = "--target_node"
@@ -80,9 +79,7 @@ command = [PYTHON_ANACONDA, VDS_GEN, file_path]
 # Define empty and required arguments to do so
 command += [EMPTY,
             FILES] + files + \
-           [FRAMES, str(num_frames),
-            HEIGHT, str(stripe_height),
-            WIDTH, str(stripe_width),
+           [SHAPE, str(num_frames), str(stripe_height), str(stripe_width),
             DATA_TYPE, data_type]
 # Override default spacing and data path
 command += [STRIPE_SPACING, "3",
