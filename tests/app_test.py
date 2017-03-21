@@ -6,27 +6,32 @@ from mock import MagicMock, patch, call
 
 from vdsgen import app
 
-parser_patch_path = "argparse.ArgumentParser"
 app_patch_path = "vdsgen.app"
+parser_patch_path = app_patch_path + ".ArgumentParser"
 VDSGenerator_patch_path = app_patch_path + ".VDSGenerator"
 
 
 class ParseArgsTest(unittest.TestCase):
 
-    @patch(parser_patch_path + '.add_mutually_exclusive_group')
-    @patch(parser_patch_path + '.add_argument_group')
-    @patch(parser_patch_path + '.add_argument')
-    @patch(parser_patch_path + '.parse_args',
-           return_value=MagicMock(empty=False, files=None))
-    def test_parser(self, parse_mock, add_mock, add_group_mock,
-                    add_exclusive_group_mock):
+    @patch(VDSGenerator_patch_path)
+    @patch(app_patch_path + '.ArgumentDefaultsHelpFormatter')
+    @patch(parser_patch_path)
+    def test_parser(self, parser_init_mock, formatter_mock, gen_mock):
+        parser_mock = parser_init_mock.return_value
+        add_mock = parser_mock.add_argument
+        add_group_mock = parser_mock.add_argument_group
+        add_exclusive_group_mock = parser_mock.add_mutually_exclusive_group
+        parse_mock = parser_mock.parse_args
+        parse_mock.return_value = MagicMock(empty=False, files=None)
         empty_mock = MagicMock()
         other_mock = MagicMock()
-        add_group_mock.side_effect = [None, None, empty_mock, other_mock]
+        add_group_mock.side_effect = [empty_mock, other_mock]
         exclusive_group_mock = add_exclusive_group_mock.return_value
 
         args = app.parse_args()
 
+        parser_init_mock.assert_called_once_with(
+            formatter_class=formatter_mock)
         add_exclusive_group_mock.assert_called_with(required=True)
         exclusive_group_mock.add_argument.assert_has_calls(
             [call("-p", "--prefix", type=str, default=None, dest="prefix",
@@ -52,20 +57,20 @@ class ParseArgsTest(unittest.TestCase):
                   help="Data type of raw datasets.")])
         other_mock.add_argument.assert_has_calls(
             [call("-o", "--output", type=str, default=None, dest="output",
-                  help="Output file name. Default is input file prefix with "
-                       "vds suffix."),
-             call("-s", "--stripe_spacing", nargs="?", type=int, default=None,
-                  dest="stripe_spacing",
+                  help="Output file name. If None then generated as input "
+                       "file prefix with vds suffix."),
+             call("-s", "--stripe_spacing", nargs="?", type=int,
+                  default=gen_mock.stripe_spacing, dest="stripe_spacing",
                   help="Spacing between two stripes in a module."),
-             call("-m", "--module_spacing", nargs="?", type=int, default=None,
-                  dest="module_spacing",
+             call("-m", "--module_spacing", nargs="?", type=int,
+                  default=gen_mock.module_spacing, dest="module_spacing",
                   help="Spacing between two modules."),
-             call("--source_node", nargs="?", type=str, default=None,
-                  dest="source_node",
-                  help="Data node in source HDF5 files."),
-             call("--target_node", nargs="?", type=str, default=None,
-                  dest="target_node",
-                  help="Data node in VDS file.")])
+             call("--source_node", nargs="?", type=str,
+                  default=gen_mock.source_node,
+                  dest="source_node", help="Data node in source HDF5 files."),
+             call("--target_node", nargs="?", type=str,
+                  default=gen_mock.target_node,
+                  dest="target_node", help="Data node in VDS file.")])
 
         parse_mock.assert_called_once_with()
         self.assertEqual(parse_mock.return_value, args)

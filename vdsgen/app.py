@@ -1,12 +1,12 @@
 import sys
-from argparse import ArgumentParser
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 
 from vdsgenerator import VDSGenerator
 
 
 def parse_args():
     """Parse command line arguments."""
-    parser = ArgumentParser()
+    parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument(
         "path", type=str, help="Root folder of source files and VDS.")
 
@@ -37,19 +37,22 @@ def parse_args():
     other_args = parser.add_argument_group()
     other_args.add_argument(
         "-o", "--output", type=str, default=None, dest="output",
-        help="Output file name. Default is input file prefix with vds suffix.")
+        help="Output file name. If None then generated as input file prefix "
+             "with vds suffix.")
     other_args.add_argument(
-        "-s", "--stripe_spacing", nargs="?", type=int, default=None,
-        dest="stripe_spacing", help="Spacing between two stripes in a module.")
+        "-s", "--stripe_spacing", nargs="?", type=int,
+        default=VDSGenerator.stripe_spacing, dest="stripe_spacing",
+        help="Spacing between two stripes in a module.")
     other_args.add_argument(
-        "-m", "--module_spacing", nargs="?", type=int, default=None,
-        dest="module_spacing", help="Spacing between two modules.")
+        "-m", "--module_spacing", nargs="?", type=int,
+        default=VDSGenerator.module_spacing, dest="module_spacing",
+        help="Spacing between two modules.")
     other_args.add_argument(
-        "--source_node", nargs="?", type=str, default=None, dest="source_node",
-        help="Data node in source HDF5 files.")
+        "--source_node", nargs="?", type=str, default=VDSGenerator.source_node,
+        dest="source_node", help="Data node in source HDF5 files.")
     other_args.add_argument(
-        "--target_node", nargs="?", type=str, default=None, dest="target_node",
-        help="Data node in VDS file.")
+        "--target_node", nargs="?", type=str, default=VDSGenerator.target_node,
+        dest="target_node", help="Data node in VDS file.")
 
     args = parser.parse_args()
     args.shape = tuple(args.shape)
