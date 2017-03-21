@@ -313,7 +313,7 @@ class GenerateVDSTest(unittest.TestCase):
         h5file_mock.assert_called_once_with(
             "/test/path/vds.hdf5", "w", libver="latest")
         vds_file_mock.create_virtual_dataset.assert_called_once_with(
-            VMlist=create_mock.return_value, fill_value=0x1)
+            VMlist=create_mock.return_value, fillvalue=0x1)
 
     @patch('os.path.isfile', return_value=True)
     @patch(VDSGenerator_patch_path + '.validate_node')
@@ -345,7 +345,7 @@ class GenerateVDSTest(unittest.TestCase):
             call("/test/path/vds.hdf5", "r", libver="latest"),
             call("/test/path/vds.hdf5", "a", libver="latest")])
         vds_file_mock.create_virtual_dataset.assert_called_once_with(
-            VMlist=create_mock.return_value, fill_value=0x1)
+            VMlist=create_mock.return_value, fillvalue=0x1)
 
     @patch('os.path.isfile', return_value=True)
     @patch(h5py_patch_path + '.File', return_value=file_mock)

@@ -139,7 +139,7 @@ class VDSGenerator(object):
         logging.info("Creating VDS at %s", self.output_file)
         with h5.File(self.output_file, self.mode, libver="latest") as vds:
             self.validate_node(vds)
-            vds.create_virtual_dataset(VMlist=map_list, fill_value=0x1)
+            vds.create_virtual_dataset(VMlist=map_list, fillvalue=0x1)
 
         logging.info("Creation successful!")
 
