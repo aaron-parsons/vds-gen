@@ -20,21 +20,40 @@ class ParseArgsTest(unittest.TestCase):
            return_value=MagicMock(empty=False, files=None))
     def test_parser(self, parse_mock, add_mock, add_group_mock,
                     add_exclusive_group_mock):
-        group_mock = add_group_mock.return_value
+        empty_mock = MagicMock()
+        other_mock = MagicMock()
+        add_group_mock.side_effect = [None, None, empty_mock, other_mock]
         exclusive_group_mock = add_exclusive_group_mock.return_value
 
         args = app.parse_args()
 
-        add_mock.assert_has_calls(
-            [call("path", type=str,
-                  help="Root folder to create VDS in. Also where source "
-                       "files are searched for if --prefix given."),
-             call("-o", "--output", type=str, default=None, dest="output",
+        add_exclusive_group_mock.assert_called_with(required=True)
+        exclusive_group_mock.add_argument.assert_has_calls(
+            [call("-p", "--prefix", type=str, default=None, dest="prefix",
+                  help="Prefix of files to search <path> for - e.g 'stripe_' "
+                       "to combine 'stripe_1.hdf5' and 'stripe_2.hdf5'."),
+             call("-f", "--files", nargs="*", type=str, default=None,
+                  dest="files",
+                  help="Explicit names of raw files in <path>.")])
+
+        add_mock.assert_called_with(
+            "path", type=str, help="Root folder of source files and VDS.")
+
+        add_group_mock.assert_has_calls([call()] * 2)
+        empty_mock.add_argument.assert_has_calls(
+            [call("-e", "--empty", action="store_true", dest="empty",
+                  help="Make empty VDS pointing to datasets "
+                       "that don't exist yet."),
+             call("--shape", type=int, nargs="*", default=[1, 256, 2048],
+                  dest="shape",
+                  help="Shape of dataset - 'frames height width', where "
+                       "frames is N dimensional."),
+             call("--data_type", type=str, default="uint16", dest="data_type",
+                  help="Data type of raw datasets.")])
+        other_mock.add_argument.assert_has_calls(
+            [call("-o", "--output", type=str, default=None, dest="output",
                   help="Output file name. Default is input file prefix with "
                        "vds suffix."),
-             call("-e", "--empty", action="store_true", dest="empty",
-                  help="Make empty VDS pointing to datasets "
-                       "that don't exist, yet."),
              call("-s", "--stripe_spacing", nargs="?", type=int, default=None,
                   dest="stripe_spacing",
                   help="Spacing between two stripes in a module."),
@@ -47,25 +66,6 @@ class ParseArgsTest(unittest.TestCase):
              call("--target_node", nargs="?", type=str, default=None,
                   dest="target_node",
                   help="Data node in VDS file.")])
-
-        add_group_mock.assert_called_with()
-        group_mock.add_argument.assert_has_calls(
-            [call("--shape", type=int, nargs="*", default=[1, 256, 2048],
-                  dest="shape",
-                  help="Shape of dataset - 'frames height width', where "
-                       "frames is N dimensional."),
-             call("--data_type", type=str, default="uint16", dest="data_type",
-                  help="Data type of raw datasets.")])
-
-        add_exclusive_group_mock.assert_called_with(required=True)
-        exclusive_group_mock.add_argument.assert_has_calls(
-            [call("-p", "--prefix", type=str, default=None, dest="prefix",
-                  help="Prefix of files - e.g 'stripe_' to combine the images "
-                       "'stripe_1.hdf5', 'stripe_2.hdf5' and 'stripe_3.hdf5' "
-                       "located at <path>."),
-             call("-f", "--files", nargs="*", type=str, default=None,
-                  dest="files",
-                  help="Manually define files to combine.")])
 
         parse_mock.assert_called_once_with()
         self.assertEqual(parse_mock.return_value, args)
