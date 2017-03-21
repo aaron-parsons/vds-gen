@@ -22,6 +22,7 @@ class VDSGenerator(object):
     # Constants
     CREATE = "w"  # Will overwrite any existing file
     APPEND = "a"
+    READ = "r"
     FULL_SLICE = slice(None)
 
     # Default Values
@@ -120,14 +121,14 @@ class VDSGenerator(object):
     def generate_vds(self):
         """Generate a virtual dataset."""
         if os.path.isfile(self.output_file):
-            with h5.File(self.output_file, "r", libver="latest") as vds:
+            with h5.File(self.output_file, self.READ, libver="latest") as vds:
                 node = vds.get(self.target_node)
-                if node is not None:
-                    raise IOError("VDS {file} already has an entry for node "
-                                  "{node}".format(file=self.output_file,
-                                                  node=self.target_node))
-                else:
-                    self.mode = self.APPEND
+            if node is not None:
+                raise IOError("VDS {file} already has an entry for node "
+                              "{node}".format(file=self.output_file,
+                                              node=self.target_node))
+            else:
+                self.mode = self.APPEND
 
         file_names = [file_.split('/')[-1] for file_ in self.datasets]
         logging.info("Combining datasets %s into %s",
