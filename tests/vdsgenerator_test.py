@@ -250,12 +250,12 @@ class ValidateNodeTest(unittest.TestCase):
         self.file_mock = MagicMock()
 
     def test_validate_node_creates(self):
-        gen = VDSGeneratorTester(target_node="entry/detector/detector1")
+        gen = VDSGeneratorTester(target_node="/entry/detector/detector1")
         self.file_mock.get.return_value = None
 
         gen.validate_node(self.file_mock)
 
-        self.file_mock.create_group.assert_called_once_with("entry/detector")
+        self.file_mock.create_group.assert_called_once_with("/entry/detector")
 
     def test_validate_node_exists_then_no_op(self):
         gen = VDSGeneratorTester(target_node="entry/detector/detector1")
@@ -265,19 +265,13 @@ class ValidateNodeTest(unittest.TestCase):
 
         self.file_mock.create_group.assert_not_called()
 
-    def test_validate_node_invalid_then_error(self):
+    def test_validate_node_trailing_slash_then_removed(self):
+        gen = VDSGeneratorTester(target_node="/entry/detector/detector1//")
+        self.file_mock.get.return_value = None
 
-        gen = VDSGeneratorTester(target_node="/entry/detector/detector1")
-        with self.assertRaises(ValueError):
-            gen.validate_node(self.file_mock)
+        gen.validate_node(self.file_mock)
 
-        gen = VDSGeneratorTester(target_node="entry/detector/detector1/")
-        with self.assertRaises(ValueError):
-            gen.validate_node(self.file_mock)
-
-        gen = VDSGeneratorTester(target_node="/entry/detector/detector1/")
-        with self.assertRaises(ValueError):
-            gen.validate_node(self.file_mock)
+        self.file_mock.create_group.assert_called_once_with("/entry/detector")
 
 
 class GenerateVDSTest(unittest.TestCase):

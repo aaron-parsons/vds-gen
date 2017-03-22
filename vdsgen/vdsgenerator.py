@@ -292,16 +292,14 @@ class VDSGenerator(object):
     def validate_node(self, vds_file):
         """Check if it is possible to create the given node.
 
-        Check the target node is valid (no leading or trailing slashes)
         Create any sub-group of the target node if it doesn't exist.
 
         Args:
             vds_file(h5py.File): File to check for node
 
         """
-        if self.target_node.startswith("/") or self.target_node.endswith("/"):
-            raise ValueError("Target node should have no leading or trailing "
-                             "slashes, got {}".format(self.target_node))
+        while self.target_node.endswith("/"):
+            self.target_node = self.target_node[:-1]
 
         if "/" in self.target_node:
             sub_group = self.target_node.rsplit("/", 1)[0]
