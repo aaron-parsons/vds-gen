@@ -9,8 +9,6 @@ from collections import namedtuple
 
 import h5py as h5
 
-logging.basicConfig(level=logging.INFO)
-
 Source = namedtuple("Source", ["frames", "height", "width", "dtype"])
 VDS = namedtuple("VDS", ["shape", "spacing"])
 
@@ -31,10 +29,16 @@ class VDSGenerator(object):
     source_node = "data"  # Data node in source HDF5 files
     target_node = "full_frame"  # Data node in VDS file
     mode = CREATE  # Write mode for vds file
+    log_level = 2
+
+    logger = logging.getLogger("VDSGenerator")
+    logger.addHandler(logging.StreamHandler())
+    logger.setLevel(log_level * 10)
 
     def __init__(self, path, prefix=None, files=None, output=None, source=None,
                  source_node=None, target_node=None,
-                 stripe_spacing=None, module_spacing=None):
+                 stripe_spacing=None, module_spacing=None,
+                 log_level=None):
         """
         Args:
             path(str): Root folder to find raw files and create VDS
@@ -48,6 +52,8 @@ class VDSGenerator(object):
             target_node(str): Data node in VDS file
             stripe_spacing(int): Spacing between stripes in module
             module_spacing(int): Spacing between modules
+            log_level(int): Logging level (off=3, info=2, debug=1) -
+                Default is info
 
         """
         if (prefix is None and files is None) or \
@@ -65,6 +71,8 @@ class VDSGenerator(object):
             self.stripe_spacing = stripe_spacing
         if module_spacing is not None:
             self.module_spacing = module_spacing
+        if log_level is not None:
+            self.logger.setLevel(log_level * 10)
 
         # If Files not given, find files using path and prefix.
         if files is None:
@@ -130,19 +138,13 @@ class VDSGenerator(object):
             else:
                 self.mode = self.APPEND
 
-        file_names = [file_.split('/')[-1] for file_ in self.datasets]
-        logging.info("Combining datasets %s into %s",
-                     ", ".join(file_names), self.name)
-
         vds_data = self.construct_vds_metadata(self.source_metadata)
         map_list = self.create_vds_maps(self.source_metadata, vds_data)
 
-        logging.info("Creating VDS at %s", self.output_file)
+        self.logger.info("Creating VDS at %s", self.output_file)
         with h5.File(self.output_file, self.mode, libver="latest") as vds:
             self.validate_node(vds)
             vds.create_virtual_dataset(VMlist=map_list, fillvalue=0x1)
-
-        logging.info("Creation successful!")
 
     def find_files(self):
         """Find HDF5 files in given folder with given prefix.
@@ -166,6 +168,8 @@ class VDSGenerator(object):
             raise IOError("Folder must contain more than one matching HDF5 "
                           "file.")
         else:
+            self.logger.debug("Found datasets %s",
+                              ", ".join([f.split("/")[-1] for f in files]))
             return files
 
     def construct_vds_name(self, files):
@@ -181,6 +185,7 @@ class VDSGenerator(object):
         _, ext = os.path.splitext(files[0])
         vds_name = "{prefix}vds{ext}".format(prefix=self.prefix, ext=ext)
 
+        self.logger.debug("Generated VDS name: %s", vds_name)
         return vds_name
 
     def grab_metadata(self, file_path):
@@ -215,8 +220,11 @@ class VDSGenerator(object):
                     raise ValueError("Files have mismatched "
                                      "{}".format(attribute))
 
-        return Source(frames=data['frames'], height=data['height'],
-                      width=data['width'], dtype=data['dtype'])
+        source = Source(frames=data['frames'], height=data['height'],
+                        width=data['width'], dtype=data['dtype'])
+
+        self.logger.debug("Source metadata retrieved: %s", source)
+        return source
 
     def construct_vds_metadata(self, source):
         """Construct VDS data attributes from source attributes.
@@ -240,7 +248,9 @@ class VDSGenerator(object):
         height = (source.height * stripes) + sum(spacing)
         shape = source.frames + (height, source.width)
 
-        return VDS(shape=shape, spacing=spacing)
+        vds = VDS(shape=shape, spacing=spacing)
+        self.logger.debug("VDS metadata constructed: %s", vds)
+        return vds
 
     def create_vds_maps(self, source, vds_data):
         """Create a list of VirtualMaps of raw data to the VDS.
@@ -260,7 +270,6 @@ class VDSGenerator(object):
         map_list = []
         current_position = 0
         for idx, dataset in enumerate(self.datasets):
-            logging.info("Processing dataset %s", idx + 1)
 
             v_source = h5.VirtualSource(dataset, self.source_node,
                                         shape=source_shape)
@@ -273,6 +282,9 @@ class VDSGenerator(object):
                           [slice(start, stop)] + [self.FULL_SLICE])
             v_target = vds[index]
             v_map = h5.VirtualMap(v_source, v_target, dtype=source.dtype)
+
+            self.logger.debug("Mapping dataset %s to %s of %s.",
+                              dataset.split("/")[-1], index, self.name)
             map_list.append(v_map)
 
         return map_list

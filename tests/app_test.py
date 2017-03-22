@@ -105,7 +105,8 @@ class MainTest(unittest.TestCase):
                files=["file1.hdf5", "file2.hdf5"], output="vds",
                shape=[3, 256, 2048], data_type="int16",
                source_node="data", target_node="full_frame",
-               stripe_spacing=3, module_spacing=127))
+               stripe_spacing=3, module_spacing=127,
+               log_level=2))
     def test_main_empty(self, parse_mock, init_mock):
         gen_mock = init_mock.return_value
         args_mock = parse_mock.return_value
@@ -121,7 +122,8 @@ class MainTest(unittest.TestCase):
             source_node=args_mock.source_node,
             target_node=args_mock.target_node,
             stripe_spacing=args_mock.stripe_spacing,
-            module_spacing=args_mock.module_spacing)
+            module_spacing=args_mock.module_spacing,
+            log_level=args_mock.log_level)
 
         gen_mock.generate_vds.assert_called_once_with()
 
@@ -132,7 +134,8 @@ class MainTest(unittest.TestCase):
                files=["file1.hdf5", "file2.hdf5"], output="vds",
                frames=3, height=256, width=2048, data_type="int16",
                source_node="data", target_node="full_frame",
-               stripe_spacing=3, module_spacing=127))
+               stripe_spacing=3, module_spacing=127,
+               log_level=2))
     def test_main_not_empty(self, parse_mock, generate_mock):
         args_mock = parse_mock.return_value
 
@@ -146,4 +149,5 @@ class MainTest(unittest.TestCase):
             source_node=args_mock.source_node,
             stripe_spacing=args_mock.stripe_spacing,
             target_node=args_mock.target_node,
-            module_spacing=args_mock.module_spacing)
+            module_spacing=args_mock.module_spacing,
+            log_level=args_mock.log_level)

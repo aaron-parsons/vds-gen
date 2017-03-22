@@ -53,6 +53,9 @@ def parse_args():
     other_args.add_argument(
         "--target_node", nargs="?", type=str, default=VDSGenerator.target_node,
         dest="target_node", help="Data node in VDS file.")
+    other_args.add_argument(
+        "-l", "--log_level", type=int, default=VDSGenerator.log_level,
+        dest="log_level", help="Logging level (off=3, info=2, debug=1).")
 
     args = parser.parse_args()
     args.shape = tuple(args.shape)
@@ -83,7 +86,8 @@ def main():
                        source_node=args.source_node,
                        target_node=args.target_node,
                        stripe_spacing=args.stripe_spacing,
-                       module_spacing=args.module_spacing)
+                       module_spacing=args.module_spacing,
+                       log_level=args.log_level)
 
     gen.generate_vds()
 
