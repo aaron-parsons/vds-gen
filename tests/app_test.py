@@ -27,10 +27,27 @@ class ParseArgsTest(unittest.TestCase):
         other_mock = MagicMock()
         add_group_mock.side_effect = [empty_mock, other_mock]
         exclusive_group_mock = add_exclusive_group_mock.return_value
+        expected_message = """
+-------------------------------------------------------------------------------
+A script to create a virtual dataset composed of multiple raw HDF5 files.
+
+The minimum required arguments are <path> and either -p <prefix> or -f <files>.
+
+For example:
+
+ > ../vdsgen/app.py /scratch/images -p stripe_
+ > ../vdsgen/app.py /scratch/images -f stripe_1.hdf5 stripe_2.hdf5
+
+You can create an empty VDS, for raw files that don't exist yet, with the -e
+flag; you will then need to provide --shape and --data_type, though defaults
+are provided for these.
+-------------------------------------------------------------------------------
+"""
 
         args = app.parse_args()
 
         parser_init_mock.assert_called_once_with(
+            usage=expected_message,
             formatter_class=formatter_mock)
         add_exclusive_group_mock.assert_called_with(required=True)
         exclusive_group_mock.add_argument.assert_has_calls(
@@ -53,24 +70,27 @@ class ParseArgsTest(unittest.TestCase):
                   dest="shape",
                   help="Shape of dataset - 'frames height width', where "
                        "frames is N dimensional."),
-             call("--data_type", type=str, default="uint16", dest="data_type",
-                  help="Data type of raw datasets.")])
+             call("-t", "--data_type", type=str, default="uint16",
+                  dest="data_type", help="Data type of raw datasets.")])
         other_mock.add_argument.assert_has_calls(
             [call("-o", "--output", type=str, default=None, dest="output",
                   help="Output file name. If None then generated as input "
                        "file prefix with vds suffix."),
-             call("-s", "--stripe_spacing", nargs="?", type=int,
-                  default=gen_mock.stripe_spacing, dest="stripe_spacing",
+             call("-s", "--stripe_spacing", type=int, dest="stripe_spacing",
+                  default=gen_mock.stripe_spacing,
                   help="Spacing between two stripes in a module."),
-             call("-m", "--module_spacing", nargs="?", type=int,
-                  default=gen_mock.module_spacing, dest="module_spacing",
+             call("-m", "--module_spacing", type=int, dest="module_spacing",
+                  default=gen_mock.module_spacing,
                   help="Spacing between two modules."),
-             call("--source_node", nargs="?", type=str,
+             call("--source_node", type=str, dest="source_node",
                   default=gen_mock.source_node,
-                  dest="source_node", help="Data node in source HDF5 files."),
-             call("--target_node", nargs="?", type=str,
-                  default=gen_mock.target_node,
-                  dest="target_node", help="Data node in VDS file.")])
+                  help="Data node in source HDF5 files."),
+             call("--target_node", type=str,
+                  default=gen_mock.target_node, dest="target_node",
+                  help="Data node in VDS file."),
+             call("-l", "--log_level", type=int, dest="log_level",
+                  default=gen_mock.log_level,
+                  help="Logging level (off=3, info=2, debug=1).")])
 
         parse_mock.assert_called_once_with()
         self.assertEqual(parse_mock.return_value, args)
