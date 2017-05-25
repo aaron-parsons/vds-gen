@@ -9,14 +9,17 @@ from vdsgen import app
 app_patch_path = "vdsgen.app"
 parser_patch_path = app_patch_path + ".ArgumentParser"
 VDSGenerator_patch_path = app_patch_path + ".VDSGenerator"
+SubFrameVDSGenerator_patch_path = app_patch_path + ".SubFrameVDSGenerator"
 
 
 class ParseArgsTest(unittest.TestCase):
 
+    @patch(SubFrameVDSGenerator_patch_path)
     @patch(VDSGenerator_patch_path)
     @patch(app_patch_path + '.ArgumentDefaultsHelpFormatter')
     @patch(parser_patch_path)
-    def test_parser(self, parser_init_mock, formatter_mock, gen_mock):
+    def test_parser(self, parser_init_mock, formatter_mock, gen_mock,
+                    subframegen_mock):
         parser_mock = parser_init_mock.return_value
         add_mock = parser_mock.add_argument
         add_group_mock = parser_mock.add_argument_group
@@ -77,10 +80,10 @@ are provided for these.
                   help="Output file name. If None then generated as input "
                        "file prefix with vds suffix."),
              call("-s", "--stripe_spacing", type=int, dest="stripe_spacing",
-                  default=gen_mock.stripe_spacing,
+                  default=subframegen_mock.stripe_spacing,
                   help="Spacing between two stripes in a module."),
              call("-m", "--module_spacing", type=int, dest="module_spacing",
-                  default=gen_mock.module_spacing,
+                  default=subframegen_mock.module_spacing,
                   help="Spacing between two modules."),
              call("--source_node", type=str, dest="source_node",
                   default=gen_mock.source_node,
@@ -88,6 +91,9 @@ are provided for these.
              call("--target_node", type=str,
                   default=gen_mock.target_node, dest="target_node",
                   help="Data node in VDS file."),
+             call("--mode", default="sub-frames", dest="mode",
+                  help="Type of raw datasets  sub-frames: ND datasets containing sub_frames of full image  frames:     1D datasets containing interspersed frames",
+                  type=str),
              call("-l", "--log_level", type=int, dest="log_level",
                   default=gen_mock.log_level,
                   help="Logging level (off=3, info=2, debug=1).")])
@@ -118,14 +124,16 @@ are provided for these.
 
 
 class MainTest(unittest.TestCase):
+
     @patch(VDSGenerator_patch_path)
     @patch(app_patch_path + '.parse_args',
            return_value=MagicMock(
-               path="/test/path", prefix="stripe_", empty=True,
+               path="/test/path", empty=True,
                files=["file1.hdf5", "file2.hdf5"], output="vds",
                shape=[3, 256, 2048], data_type="int16",
                source_node="data", target_node="full_frame",
                stripe_spacing=3, module_spacing=127,
+               mode="sub-frames",
                log_level=2))
     def test_main_empty(self, parse_mock, init_mock):
         gen_mock = init_mock.return_value

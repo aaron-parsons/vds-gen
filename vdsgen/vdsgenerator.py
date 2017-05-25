@@ -1,5 +1,5 @@
 #!/bin/env dls-python
-"""A CLI tool for generating virtual datasets from individual HDF5 files."""
+"""A class for generating virtual datasets from individual HDF5 files."""
 
 import os
 import re
@@ -9,8 +9,7 @@ from collections import namedtuple
 
 import h5py as h5
 
-Source = namedtuple("Source", ["frames", "height", "width", "dtype"])
-VDS = namedtuple("VDS", ["shape", "spacing"])
+SourceMeta = namedtuple("SourceMeta", ["frames", "height", "width", "dtype"])
 
 
 class VDSGenerator(object):
@@ -24,20 +23,15 @@ class VDSGenerator(object):
     FULL_SLICE = slice(None)
 
     # Default Values
-    stripe_spacing = 10  # Pixel spacing between stripes in a module
-    module_spacing = 10  # Pixel spacing between modules
     source_node = "data"  # Data node in source HDF5 files
     target_node = "full_frame"  # Data node in VDS file
     mode = CREATE  # Write mode for vds file
     log_level = 2
 
     logger = logging.getLogger("VDSGenerator")
-    logger.addHandler(logging.StreamHandler())
-    logger.setLevel(log_level * 10)
 
     def __init__(self, path, prefix=None, files=None, output=None, source=None,
                  source_node=None, target_node=None,
-                 stripe_spacing=None, module_spacing=None,
                  log_level=None):
         """
         Args:
@@ -50,12 +44,13 @@ class VDSGenerator(object):
                 Provide this to create a VDS for raw files that don't exist yet
             source_node(str): Data node in source HDF5 files
             target_node(str): Data node in VDS file
-            stripe_spacing(int): Spacing between stripes in module
-            module_spacing(int): Spacing between modules
             log_level(int): Logging level (off=3, info=2, debug=1) -
                 Default is info
 
         """
+        self.logger.addHandler(logging.StreamHandler())
+        self.logger.setLevel(self.log_level * 10)
+
         if (prefix is None and files is None) or \
                 (prefix is not None and files is not None):
             raise ValueError("One, and only one, of prefix or files required.")
@@ -67,10 +62,6 @@ class VDSGenerator(object):
             self.source_node = source_node
         if target_node is not None:
             self.target_node = target_node
-        if stripe_spacing is not None:
-            self.stripe_spacing = stripe_spacing
-        if module_spacing is not None:
-            self.module_spacing = module_spacing
         if log_level is not None:
             self.logger.setLevel(log_level * 10)
 
@@ -102,7 +93,7 @@ class VDSGenerator(object):
         # Else, store given source metadata
         else:
             frames, height, width = self.parse_shape(source['shape'])
-            self.source_metadata = Source(
+            self.source_metadata = SourceMeta(
                 frames=frames, height=height, width=width,
                 dtype=source['dtype'])
 
@@ -138,8 +129,7 @@ class VDSGenerator(object):
             else:
                 self.mode = self.APPEND
 
-        vds_data = self.construct_vds_metadata(self.source_metadata)
-        map_list = self.create_vds_maps(self.source_metadata, vds_data)
+        map_list = self.create_vds_maps(self.source_metadata)
 
         self.logger.info("Creating VDS at %s", self.output_file)
         with h5.File(self.output_file, self.mode, libver="latest") as vds:
@@ -168,7 +158,7 @@ class VDSGenerator(object):
             raise IOError("Folder must contain more than one matching HDF5 "
                           "file.")
         else:
-            self.logger.debug("Found datasets %s",
+            self.logger.debug("Found datasets:\n  %s",
                               ", ".join([f.split("/")[-1] for f in files]))
             return files
 
@@ -185,7 +175,7 @@ class VDSGenerator(object):
         _, ext = os.path.splitext(files[0])
         vds_name = "{prefix}vds{ext}".format(prefix=self.prefix, ext=ext)
 
-        self.logger.debug("Generated VDS name: %s", vds_name)
+        self.logger.debug("Generated VDS name:\n  %s", vds_name)
         return vds_name
 
     def grab_metadata(self, file_path):
@@ -212,82 +202,19 @@ class VDSGenerator(object):
                 height width and data type)
 
         """
-        data = self.grab_metadata(self.datasets[0])
-        for dataset in self.datasets[1:]:
-            temp_data = self.grab_metadata(dataset)
-            for attribute, value in data.items():
-                if temp_data[attribute] != value:
-                    raise ValueError("Files have mismatched "
-                                     "{}".format(attribute))
+        raise NotImplementedError("Must be implemented in child class")
 
-        source = Source(frames=data['frames'], height=data['height'],
-                        width=data['width'], dtype=data['dtype'])
-
-        self.logger.debug("Source metadata retrieved: %s", source)
-        return source
-
-    def construct_vds_metadata(self, source):
-        """Construct VDS data attributes from source attributes.
-
-        Args:
-            source(Source): Attributes of data sets
-
-        Returns:
-            VDS: Shape, dataset spacing and output path of virtual data set
-
-        """
-        stripes = len(self.datasets)
-        spacing = [0] * stripes
-        for idx in range(0, stripes - 1, 2):
-            spacing[idx] = self.stripe_spacing
-        for idx in range(1, stripes, 2):
-            spacing[idx] = self.module_spacing
-        # We don't want the final stripe to have a gap afterwards
-        spacing[-1] = 0
-
-        height = (source.height * stripes) + sum(spacing)
-        shape = source.frames + (height, source.width)
-
-        vds = VDS(shape=shape, spacing=spacing)
-        self.logger.debug("VDS metadata constructed: %s", vds)
-        return vds
-
-    def create_vds_maps(self, source, vds_data):
+    def create_vds_maps(self, source):
         """Create a list of VirtualMaps of raw data to the VDS.
 
         Args:
             source(Source): Source attributes
-            vds_data(VDS): VDS attributes
 
         Returns:
             list(VirtualMap): Maps describing links between raw data and VDS
 
         """
-        source_shape = source.frames + (source.height, source.width)
-        vds = h5.VirtualTarget(self.output_file, self.target_node,
-                               shape=vds_data.shape)
-
-        map_list = []
-        current_position = 0
-        for idx, dataset in enumerate(self.datasets):
-
-            v_source = h5.VirtualSource(dataset, self.source_node,
-                                        shape=source_shape)
-
-            start = current_position
-            stop = start + source.height + vds_data.spacing[idx]
-            current_position = stop
-
-            index = tuple([self.FULL_SLICE] * len(source.frames) +
-                          [slice(start, stop)] + [self.FULL_SLICE])
-            v_target = vds[index]
-            v_map = h5.VirtualMap(v_source, v_target, dtype=source.dtype)
-
-            self.logger.debug("Mapping dataset %s to %s of %s.",
-                              dataset.split("/")[-1], index, self.name)
-            map_list.append(v_map)
-
-        return map_list
+        raise NotImplementedError("Must be implemented in child class")
 
     def validate_node(self, vds_file):
         """Check if it is possible to create the given node.

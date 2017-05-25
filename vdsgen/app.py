@@ -2,6 +2,8 @@ import sys
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 
 from vdsgenerator import VDSGenerator
+from framevdsgenerator import FrameVDSGenerator
+from subframevdsgenerator import SubFrameVDSGenerator
 
 help_message = """
 -------------------------------------------------------------------------------
@@ -59,11 +61,11 @@ def parse_args():
              "with vds suffix.")
     other_args.add_argument(
         "-s", "--stripe_spacing", type=int, dest="stripe_spacing",
-        default=VDSGenerator.stripe_spacing,
+        default=SubFrameVDSGenerator.stripe_spacing,
         help="Spacing between two stripes in a module.")
     other_args.add_argument(
         "-m", "--module_spacing", type=int, dest="module_spacing",
-        default=VDSGenerator.module_spacing,
+        default=SubFrameVDSGenerator.module_spacing,
         help="Spacing between two modules.")
     other_args.add_argument(
         "--source_node", type=str, dest="source_node",
@@ -72,6 +74,11 @@ def parse_args():
     other_args.add_argument(
         "--target_node", type=str, dest="target_node",
         default=VDSGenerator.target_node, help="Data node in VDS file.")
+    other_args.add_argument(
+        "--mode", type=str, dest="mode", default="sub-frames",
+        help="Type of raw datasets"
+             "  sub-frames: ND datasets containing sub_frames of full image"
+             "  frames:     1D datasets containing interspersed frames")
     other_args.add_argument(
         "-l", "--log_level", type=int, dest="log_level",
         default=VDSGenerator.log_level,
@@ -99,15 +106,27 @@ def main():
     else:
         source_metadata = None
 
-    gen = VDSGenerator(args.path,
-                       prefix=args.prefix, files=args.files,
-                       output=args.output,
-                       source=source_metadata,
-                       source_node=args.source_node,
-                       target_node=args.target_node,
-                       stripe_spacing=args.stripe_spacing,
-                       module_spacing=args.module_spacing,
-                       log_level=args.log_level)
+    if args.mode == "frames":
+        gen = FrameVDSGenerator(args.path,
+                                prefix=args.prefix, files=args.files,
+                                output=args.output,
+                                source=source_metadata,
+                                source_node=args.source_node,
+                                target_node=args.target_node,
+                                log_level=args.log_level)
+    elif args.mode == "sub-frames":
+        gen = SubFrameVDSGenerator(args.path,
+                                   prefix=args.prefix, files=args.files,
+                                   output=args.output,
+                                   source=source_metadata,
+                                   source_node=args.source_node,
+                                   target_node=args.target_node,
+                                   stripe_spacing=args.stripe_spacing,
+                                   module_spacing=args.module_spacing,
+                                   log_level=args.log_level)
+    else:
+        raise NotImplementedError("Invalid VDS mode. Must be either frames or "
+                                  "sub-frames.")
 
     gen.generate_vds()
 
