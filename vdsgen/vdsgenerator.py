@@ -77,12 +77,12 @@ class VDSGenerator(object):
         # If Files not given, find files using path and prefix.
         if files is None:
             self.prefix = prefix
-            self.datasets = self.find_files()
-            files = [path_.split("/")[-1] for path_ in self.datasets]
+            self.raw_files = self.find_files()
+            files = [path_.split("/")[-1] for path_ in self.raw_files]
         # Else, get common prefix of given files and store full path
         else:
             self.prefix = os.path.commonprefix(files)
-            self.datasets = [os.path.join(path, file_) for file_ in files]
+            self.raw_files = [os.path.join(path, file_) for file_ in files]
 
         # If output vds file name given, use, otherwise generate a default
         if output is None:
@@ -92,7 +92,7 @@ class VDSGenerator(object):
 
         # If source not given, check files exist and get metadata.
         if source is None:
-            for file_ in self.datasets:
+            for file_ in self.raw_files:
                 if not os.path.isfile(file_):
                     raise IOError(
                         "File {} does not exist. To create VDS from raw "
@@ -212,8 +212,8 @@ class VDSGenerator(object):
                 height width and data type)
 
         """
-        data = self.grab_metadata(self.datasets[0])
-        for dataset in self.datasets[1:]:
+        data = self.grab_metadata(self.raw_files[0])
+        for dataset in self.raw_files[1:]:
             temp_data = self.grab_metadata(dataset)
             for attribute, value in data.items():
                 if temp_data[attribute] != value:
@@ -236,7 +236,7 @@ class VDSGenerator(object):
             VDS: Shape, dataset spacing and output path of virtual data set
 
         """
-        stripes = len(self.datasets)
+        stripes = len(self.raw_files)
         spacing = [0] * stripes
         for idx in range(0, stripes - 1, 2):
             spacing[idx] = self.stripe_spacing
@@ -269,9 +269,11 @@ class VDSGenerator(object):
 
         map_list = []
         current_position = 0
-        for idx, dataset in enumerate(self.datasets):
+        for idx, file_ in enumerate(self.raw_files):
+            file_name = file_.split("/")[-1]
 
-            v_source = h5.VirtualSource(dataset, self.source_node,
+            v_source = h5.VirtualSource("../" + file_name,
+                                        self.source_node,
                                         shape=source_shape)
 
             start = current_position
@@ -283,8 +285,8 @@ class VDSGenerator(object):
             v_target = vds[index]
             v_map = h5.VirtualMap(v_source, v_target, dtype=source.dtype)
 
-            self.logger.debug("Mapping dataset %s to %s of %s.",
-                              dataset.split("/")[-1], index, self.name)
+            self.logger.debug("Mapping %s to %s of %s.",
+                              file_name, index, self.name)
             map_list.append(v_map)
 
         return map_list

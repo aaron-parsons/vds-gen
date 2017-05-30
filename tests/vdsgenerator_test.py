@@ -53,7 +53,7 @@ class VDSGeneratorInitTest(unittest.TestCase):
         self.assertEqual("/test/path", gen.path)
         self.assertEqual("stripe_", gen.prefix)
         self.assertEqual("stripe_vds.hdf5", gen.name)
-        self.assertEqual(find_mock.return_value, gen.datasets)
+        self.assertEqual(find_mock.return_value, gen.raw_files)
         self.assertEqual(process_mock.return_value, gen.source_metadata)
         self.assertEqual("data", gen.source_node)
         self.assertEqual("full_frame", gen.target_node)
@@ -79,7 +79,7 @@ class VDSGeneratorInitTest(unittest.TestCase):
         self.assertEqual("/test/path", gen.path)
         self.assertEqual("stripe_", gen.prefix)
         self.assertEqual("vds.hdf5", gen.name)
-        self.assertEqual(file_paths, gen.datasets)
+        self.assertEqual(file_paths, gen.raw_files)
         self.assertEqual(source, gen.source_metadata)
         self.assertEqual("entry/data/data", gen.source_node)
         self.assertEqual("entry/detector/detector1", gen.target_node)
@@ -183,7 +183,7 @@ class SimpleFunctionsTest(unittest.TestCase):
     @patch(VDSGenerator_patch_path + '.grab_metadata',
            return_value=dict(frames=(3,), height=256, width=2048, dtype="uint16"))
     def test_process_source_datasets_given_valid_data(self, grab_mock):
-        gen = VDSGeneratorTester(datasets=["stripe_1.h5", "stripe_2.h5"])
+        gen = VDSGeneratorTester(raw_files=["stripe_1.h5", "stripe_2.h5"])
         expected_source = vdsgenerator.Source(frames=(3,), height=256,
                                               width=2048,
                                               dtype="uint16")
@@ -198,7 +198,7 @@ class SimpleFunctionsTest(unittest.TestCase):
                         dict(frames=4, height=256, width=2048,
                              dtype="uint16")])
     def test_process_source_datasets_given_mismatched_data(self, grab_mock):
-        gen = VDSGeneratorTester(datasets=["stripe_1.h5", "stripe_2.h5"])
+        gen = VDSGeneratorTester(raw_files=["stripe_1.h5", "stripe_2.h5"])
 
         with self.assertRaises(ValueError):
             gen.process_source_datasets()
@@ -206,7 +206,7 @@ class SimpleFunctionsTest(unittest.TestCase):
         grab_mock.assert_has_calls([call("stripe_1.h5"), call("stripe_2.h5")])
 
     def test_construct_vds_metadata(self):
-        gen = VDSGeneratorTester(datasets=[""] * 6, stripe_spacing=10,
+        gen = VDSGeneratorTester(raw_files=[""] * 6, stripe_spacing=10,
                                  module_spacing=100)
         source = vdsgenerator.Source(frames=(3,), height=256, width=2048,
                                      dtype="uint16")
@@ -224,7 +224,7 @@ class SimpleFunctionsTest(unittest.TestCase):
         gen = VDSGeneratorTester(output_file="/test/path/vds.hdf5",
                                  stripe_spacing=10, module_spacing=100,
                                  target_node="full_frame", source_node="data",
-                                 datasets=["source"] * 6, name="vds.hdf5")
+                                 raw_files=["source.hdf5"] * 6, name="vds.hdf5")
         source = vdsgenerator.Source(frames=(3,), height=256, width=2048,
                                      dtype="uint16")
         vds = vdsgenerator.VDS(shape=(3, 1586, 2048), spacing=[10] * 5 + [0])
@@ -234,7 +234,7 @@ class SimpleFunctionsTest(unittest.TestCase):
         target_mock.assert_called_once_with("/test/path/vds.hdf5",
                                             "full_frame",
                                             shape=(3, 1586, 2048))
-        source_mock.assert_has_calls([call("source", "data",
+        source_mock.assert_has_calls([call("../source.hdf5", "data",
                                            shape=(3, 256, 2048))] * 6)
         # TODO: Improve this assert by passing numpy arrays to check slicing
         map_mock.assert_has_calls([
@@ -290,7 +290,7 @@ class GenerateVDSTest(unittest.TestCase):
                                  output_file="/test/path/vds.hdf5",
                                  name="vds.hdf5",
                                  target_node="full_frame", source_node="data",
-                                 datasets=["stripe_1.hdf5", "stripe_2.hdf5",
+                                 raw_files=["stripe_1.hdf5", "stripe_2.hdf5",
                                            "stripe_3.hdf5"],
                                  source_metadata=source_mock)
         self.file_mock.reset_mock()
@@ -321,7 +321,7 @@ class GenerateVDSTest(unittest.TestCase):
                                  output_file="/test/path/vds.hdf5",
                                  name="vds.hdf5",
                                  target_node="full_frame", source_node="data",
-                                 datasets=["stripe_1.hdf5", "stripe_2.hdf5",
+                                 raw_files=["stripe_1.hdf5", "stripe_2.hdf5",
                                            "stripe_3.hdf5"],
                                  source_metadata=source_mock)
         self.file_mock.reset_mock()
@@ -350,7 +350,7 @@ class GenerateVDSTest(unittest.TestCase):
                                  output_file="/test/path/vds.hdf5",
                                  name="vds.hdf5",
                                  target_node="full_frame", source_node="data",
-                                 datasets=["stripe_1.hdf5", "stripe_2.hdf5",
+                                 raw_files=["stripe_1.hdf5", "stripe_2.hdf5",
                                            "stripe_3.hdf5"],
                                  source_metadata=source_mock)
         self.file_mock.reset_mock()
