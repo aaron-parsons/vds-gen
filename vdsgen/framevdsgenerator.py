@@ -15,7 +15,7 @@ class FrameVDSGenerator(VDSGenerator):
     logger = logging.getLogger("FrameVDSGenerator")
 
     def __init__(self, path, prefix=None, files=None, output=None, source=None,
-                 source_node=None, target_node=None,
+                 source_node=None, target_node=None, fill_value=None,
                  log_level=None):
         """
         Args:
@@ -28,6 +28,7 @@ class FrameVDSGenerator(VDSGenerator):
                 Provide this to create a VDS for raw files that don't exist yet
             source_node(str): Data node in source HDF5 files
             target_node(str): Data node in VDS file
+            fill_value(int): Fill value for spacing
             log_level(int): Logging level (off=3, info=2, debug=1) -
                 Default is info
 
@@ -36,7 +37,7 @@ class FrameVDSGenerator(VDSGenerator):
 
         super(FrameVDSGenerator, self).__init__(
             path, prefix, files, output, source, source_node, target_node,
-            log_level)
+            fill_value, log_level)
 
     def process_source_datasets(self):
         """Grab data from the given HDF5 files and check for consistency.

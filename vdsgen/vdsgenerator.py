@@ -23,6 +23,7 @@ class VDSGenerator(object):
     FULL_SLICE = slice(None)
 
     # Default Values
+    fill_value = 0  # Fill value for spacing
     source_node = "data"  # Data node in source HDF5 files
     target_node = "full_frame"  # Data node in VDS file
     mode = CREATE  # Write mode for vds file
@@ -31,7 +32,7 @@ class VDSGenerator(object):
     logger = logging.getLogger("VDSGenerator")
 
     def __init__(self, path, prefix=None, files=None, output=None, source=None,
-                 source_node=None, target_node=None,
+                 source_node=None, target_node=None, fill_value=None,
                  log_level=None):
         """
         Args:
@@ -44,6 +45,7 @@ class VDSGenerator(object):
                 Provide this to create a VDS for raw files that don't exist yet
             source_node(str): Data node in source HDF5 files
             target_node(str): Data node in VDS file
+            fill_value(int): Fill value for spacing
             log_level(int): Logging level (off=3, info=2, debug=1) -
                 Default is info
 
@@ -62,6 +64,8 @@ class VDSGenerator(object):
             self.source_node = source_node
         if target_node is not None:
             self.target_node = target_node
+        if fill_value is not None:
+            self.fill_value = fill_value
         if log_level is not None:
             self.logger.setLevel(log_level * 10)
 
@@ -134,7 +138,8 @@ class VDSGenerator(object):
         self.logger.info("Creating VDS at %s", self.output_file)
         with h5.File(self.output_file, self.mode, libver="latest") as vds:
             self.validate_node(vds)
-            vds.create_virtual_dataset(VMlist=map_list, fillvalue=0x1)
+            vds.create_virtual_dataset(VMlist=map_list,
+                                       fillvalue=self.fill_value)
 
     def find_files(self):
         """Find HDF5 files in given folder with given prefix.

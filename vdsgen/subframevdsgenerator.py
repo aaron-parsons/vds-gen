@@ -17,7 +17,7 @@ class SubFrameVDSGenerator(VDSGenerator):
     logger = logging.getLogger("SubFrameVDSGenerator")
 
     def __init__(self, path, prefix=None, files=None, output=None, source=None,
-                 source_node=None, target_node=None,
+                 source_node=None, target_node=None, fill_value=None,
                  stripe_spacing=None, module_spacing=None,
                  log_level=None):
         """
@@ -31,6 +31,7 @@ class SubFrameVDSGenerator(VDSGenerator):
                 Provide this to create a VDS for raw files that don't exist yet
             source_node(str): Data node in source HDF5 files
             target_node(str): Data node in VDS file
+            fill_value(int): Fill value for spacing
             stripe_spacing(int): Spacing between stripes in module
             module_spacing(int): Spacing between modules
             log_level(int): Logging level (off=3, info=2, debug=1) -
@@ -39,7 +40,7 @@ class SubFrameVDSGenerator(VDSGenerator):
         """
         super(SubFrameVDSGenerator, self).__init__(
             path, prefix, files, output, source, source_node, target_node,
-            log_level)
+            fill_value, log_level)
 
         # Overwrite default values with arguments, if given
         if stripe_spacing is not None:
